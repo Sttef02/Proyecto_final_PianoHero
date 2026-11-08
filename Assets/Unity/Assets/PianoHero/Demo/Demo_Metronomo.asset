@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 341988ce33fb4d47876e3efe7b542f53, type: 3}
+  m_Name: Demo_Metronomo
+  m_EditorClassIdentifier: 
+  titulo: Demo Metronomo
+  artista: PianoHero
+  audio: {fileID: 8300000, guid: c2e73ba4ff394bdf8e91f8f2ba5d1af7, type: 3}
+  chart: {fileID: 4900000, guid: 8f5be86b819b4c809e3c442e32657699, type: 3}
+  dificultad: Medium
+  bpm: 120
+  primerTiempo: 1
+  subdivision: 4
+  offsetExtra: 0
+  velocidad: 1
+  inicioPreview: 5
