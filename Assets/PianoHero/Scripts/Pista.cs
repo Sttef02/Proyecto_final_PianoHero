@@ -40,6 +40,11 @@ public class Pista : MonoBehaviour
     public int TotalNotas => notas.Count;
     public float UltimoTiempo { get; private set; }
     public bool Terminada => siguiente >= notas.Count && activas.Count == 0;
+    /// <summary>true mientras el jugador esta sosteniendo alguna nota larga.</summary>
+    public bool HaySostenida
+    {
+        get { foreach (var n in activas) if (n.sosteniendo) return true; return false; }
+    }
 
     class NotaRT
     {

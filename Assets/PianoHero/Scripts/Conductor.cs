@@ -61,12 +61,17 @@ public class Conductor : MonoBehaviour
     void Update()
     {
         if (!Sonando || Fuente.clip == null) return;
-        // Corrige poco a poco la deriva entre el reloj y el audio real
-        double dspT = AudioSettings.dspTime - dspInicio;
-        if (dspT <= 0) return;
+
+        // Antes de que arranque el audio (cuenta regresiva) manda el reloj programado.
+        if (AudioSettings.dspTime < dspInicio || !Fuente.isPlaying || Fuente.timeSamples <= 0) return;
+
+        // Fuente de verdad: la posicion REAL que esta sonando en la cancion.
+        // Si el audio se traba o se atrasa, las notas lo siguen y no se desfasan con el tiempo.
+        double audioT = Fuente.timeSamples / (double)Fuente.clip.frequency;
         double relT = ArduinoInput.Ahora - relojInicio;
-        double error = dspT - relT;
-        if (Math.Abs(error) > 0.1) relojInicio -= error;
-        else relojInicio -= error * 0.02;
+        double error = audioT - relT;
+
+        if (Math.Abs(error) > 0.08) relojInicio -= error;      // salto grande: corregir de una
+        else relojInicio -= error * 0.05;                       // pequeno: suavizar (timeSamples avanza a saltos)
     }
 }
