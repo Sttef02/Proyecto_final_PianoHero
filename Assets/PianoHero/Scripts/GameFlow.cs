@@ -383,10 +383,10 @@ public class GameFlow : MonoBehaviour
                 textosCanciones[i].color = activa ? colorActiva : colorNormal;
             }
         }
-
+  
         // Textos informativos
         if (textoLatencia != null)
-            textoLatencia.text = $"Latencia: {conductor.latenciaMs:0} ms  (B2 -10 / B3 +10)";
+            textoLatencia.text = $"Latencia: {conductor.latenciaMs:0} ms  (F -10 / K +10)";
         if (textoConexion != null)
             textoConexion.text = entrada.EstadoConexion;
         if (textoPerilla != null)
@@ -498,7 +498,7 @@ public class GameFlow : MonoBehaviour
                 Caja(new Rect(0, 0, W, 130 * k), new Color(0.6f, 0, 0, 0.6f));
                 GUI.Label(new Rect(0, 10 * k, W, 60 * k), "● GRABANDO CHART", sTitulo);
                 GUI.Label(new Rect(0, 70 * k, W, 50 * k),
-                    $"Notas: {grabador.Cantidad}   |   B1 + B4 (2 s) o Esc para terminar y guardar", sTexto);
+                    $"Notas: {grabador.Cantidad}   |   D + K o Esc para terminar y guardar", sTexto);
                 if (conductor.Tiempo < 0)
                     GUI.Label(new Rect(0, H * 0.3f, W, 100 * k), Mathf.CeilToInt((float)-conductor.Tiempo).ToString(), sGrande);
                 break;
