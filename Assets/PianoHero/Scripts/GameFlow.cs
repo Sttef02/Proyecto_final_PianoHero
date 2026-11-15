@@ -1,15 +1,19 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 /// <summary>
 /// Controla todo el juego: menu (potenciometro), partida, resultados y grabacion de charts.
 /// Solo pon este script en un GameObject vacio y arrastra tus canciones a la lista.
 ///
 /// Controles (Arduino / teclado):
-///   Menu:       perilla o flechas = elegir cancion | B1 (D) = jugar | B4 (K) = grabar chart
+///   Menu:       perilla, flechas o mouse = elegir cancion | B1 (D) = jugar | B4 (K) = grabar chart
+///               Mouse: rueda o pasar por encima = elegir | clic en la cancion elegida = jugar
 ///               B2 (F) / B3 (J) = latencia -10 / +10 ms
-///   Jugando:    B1..B4 = carriles | mantener B1 + B4 por 1 s (o Esc) = volver al menu
+///   Jugando:    B1..B4 = carriles | mantener B1 + B4 por 2 s (o Esc) = volver al menu
 ///   Grabando:   toca al ritmo; al terminar la cancion se guarda el chart
 ///   Resultados: B1 = volver al menu
 /// </summary>
@@ -49,6 +53,12 @@ public class GameFlow : MonoBehaviour
     public Graphic[] botonesPrueba;
     public Color colorActiva = new Color(1f, 0.6f, 0.1f);
     public Color colorNormal = Color.white;
+
+    [Header("Mouse")]
+    [Tooltip("Elegir cancion con solo pasar el mouse por encima.")]
+    public bool seleccionarAlPasar = true;
+    [Tooltip("Clic sobre la cancion ya elegida = jugar.")]
+    public bool clicParaJugar = true;
 
     public Estado EstadoActual { get; private set; } = Estado.Menu;
 
@@ -255,6 +265,13 @@ public class GameFlow : MonoBehaviour
                 if (t > conductor.Duracion + 0.5f || QuiereSalir()) TerminarGrabacion();
                 break;
             }
+
+            case Estado.Resultados:
+            {
+                LeerMouse(out _, out _, out bool clic);
+                if (clic) IrAlMenu();
+                break;
+            }
         }
 
         ActualizarUIMenu();
@@ -276,7 +293,70 @@ public class GameFlow : MonoBehaviour
         }
         if (entrada.Navegacion != 0) sel = (sel + entrada.Navegacion + n) % n;
 
+        if (ActualizarMouse(n)) return;   // el clic arranco la cancion
+
         if (sel != antes) ReproducirPreview();
+    }
+
+    // ------------------------------------------------------------------ Mouse en el menu
+
+    Vector2 ultimoMouse = new Vector2(-1, -1);
+
+    /// <summary>Rueda, pasar por encima y clic. Devuelve true si empezo una partida.</summary>
+    bool ActualizarMouse(int n)
+    {
+        LeerMouse(out Vector2 posMouse, out float rueda, out bool clic);
+
+        // Rueda: arriba = cancion anterior, abajo = siguiente
+        if (rueda > 0.01f) sel = (sel - 1 + n) % n;
+        else if (rueda < -0.01f) sel = (sel + 1) % n;
+
+        int bajoMouse = CancionBajoMouse(posMouse);
+        bool seMovio = (posMouse - ultimoMouse).sqrMagnitude > 1f;
+        ultimoMouse = posMouse;
+
+        // Solo selecciona al pasar si el mouse se movio (asi no pelea con la perilla)
+        if (seleccionarAlPasar && seMovio && bajoMouse >= 0) sel = bajoMouse;
+
+        if (clic && bajoMouse >= 0)
+        {
+            if (bajoMouse == sel && clicParaJugar)
+            {
+                Jugar();
+                return EstadoActual == Estado.Jugando;
+            }
+            sel = bajoMouse;
+        }
+        return false;
+    }
+
+    int CancionBajoMouse(Vector2 posMouse)
+    {
+        if (textosCanciones == null) return -1;
+        for (int i = 0; i < textosCanciones.Length && i < canciones.Length; i++)
+        {
+            var t = textosCanciones[i];
+            if (t == null || !t.gameObject.activeInHierarchy) continue;
+            Canvas c = t.canvas != null ? t.canvas.rootCanvas : null;
+            Camera cam = (c == null || c.renderMode == RenderMode.ScreenSpaceOverlay) ? null : c.worldCamera;
+            if (RectTransformUtility.RectangleContainsScreenPoint(t.rectTransform, posMouse, cam)) return i;
+        }
+        return -1;
+    }
+
+    static void LeerMouse(out Vector2 pos, out float rueda, out bool clic)
+    {
+#if ENABLE_INPUT_SYSTEM
+        var m = Mouse.current;
+        if (m == null) { pos = Vector2.zero; rueda = 0; clic = false; return; }
+        pos = m.position.ReadValue();
+        rueda = m.scroll.ReadValue().y;
+        clic = m.leftButton.wasPressedThisFrame;
+#else
+        pos = Input.mousePosition;
+        rueda = Input.mouseScrollDelta.y;
+        clic = Input.GetMouseButtonDown(0);
+#endif
     }
 
     // ------------------------------------------------------------------ UI del menu (Canvas)
@@ -303,10 +383,10 @@ public class GameFlow : MonoBehaviour
                 textosCanciones[i].color = activa ? colorActiva : colorNormal;
             }
         }
-
+  
         // Textos informativos
         if (textoLatencia != null)
-            textoLatencia.text = $"Latencia: {conductor.latenciaMs:0} ms  (B2 -10 / B3 +10)";
+            textoLatencia.text = $"Latencia: {conductor.latenciaMs:0} ms  (F -10 / K +10)";
         if (textoConexion != null)
             textoConexion.text = entrada.EstadoConexion;
         if (textoPerilla != null)
@@ -328,9 +408,11 @@ public class GameFlow : MonoBehaviour
     bool QuiereSalir()
     {
         if (entrada.EscapeEsteFrame) return true;
-        if (entrada.Presionado[0] && entrada.Presionado[3]) tiempoCombo += Time.deltaTime;
+        // Mantener B1 + B4 para salir, pero NO mientras se sostiene una nota
+        // (algunas canciones tienen sostenidas de B1 + B4 a la vez).
+        if (entrada.Presionado[0] && entrada.Presionado[3] && !pista.HaySostenida) tiempoCombo += Time.deltaTime;
         else tiempoCombo = 0f;
-        if (tiempoCombo > 1f) { tiempoCombo = 0f; return true; }
+        if (tiempoCombo > 2f) { tiempoCombo = 0f; return true; }
         return false;
     }
 
@@ -416,7 +498,7 @@ public class GameFlow : MonoBehaviour
                 Caja(new Rect(0, 0, W, 130 * k), new Color(0.6f, 0, 0, 0.6f));
                 GUI.Label(new Rect(0, 10 * k, W, 60 * k), "● GRABANDO CHART", sTitulo);
                 GUI.Label(new Rect(0, 70 * k, W, 50 * k),
-                    $"Notas: {grabador.Cantidad}   |   B1 + B4 (1 s) o Esc para terminar y guardar", sTexto);
+                    $"Notas: {grabador.Cantidad}   |   D + K o Esc para terminar y guardar", sTexto);
                 if (conductor.Tiempo < 0)
                     GUI.Label(new Rect(0, H * 0.3f, W, 100 * k), Mathf.CeilToInt((float)-conductor.Tiempo).ToString(), sGrande);
                 break;
@@ -432,7 +514,7 @@ public class GameFlow : MonoBehaviour
                 GUI.Label(new Rect(0, 400 * k, W, 50 * k), $"Precision: {precision:0.0}%", sTexto);
                 GUI.Label(new Rect(0, 460 * k, W, 50 * k), $"Perfectos: {perfectos}   Bien: {buenos}   Fallos: {fallos}", sTexto);
                 GUI.Label(new Rect(0, 520 * k, W, 50 * k), $"Racha maxima: {rachaMax}", sTexto);
-                GUI.Label(new Rect(0, H - 160 * k, W, 50 * k), "B1 para volver al menu", sTexto);
+                GUI.Label(new Rect(0, H - 160 * k, W, 50 * k), "B1 o clic para volver al menu", sTexto);
                 break;
             }
         }
