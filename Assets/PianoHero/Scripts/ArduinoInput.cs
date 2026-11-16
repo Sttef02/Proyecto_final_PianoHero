@@ -29,6 +29,10 @@ public class ArduinoInput : MonoBehaviour
     [Header("Teclado de respaldo")]
     public bool tecladoActivo = true;
 
+    [Header("Depuracion")]
+    [Tooltip("Escribe en la Console de Unity cada boton que se presiona o se suelta.")]
+    public bool mostrarBotonesEnConsola = true;
+
     /// <summary>carril 0-3, instante del evento (reloj interno, segundos)</summary>
     public event Action<int, double> OnPress;
     public event Action<int, double> OnRelease;
@@ -276,7 +280,7 @@ public class ArduinoInput : MonoBehaviour
         {
             switch (e.tipo)
             {
-                case 'B': Cambiar(e.valor, e.dato == 1, e.t); break;
+                case 'B': Cambiar(e.valor, e.dato == 1, e.t, "Arduino"); break;
                 case 'P': Pot01 = Mathf.Clamp01(e.valor / 1023f); PotRecibido = true; break;
                 case 'R':
                     Conectado = true;
@@ -301,8 +305,8 @@ public class ArduinoInput : MonoBehaviour
         Key[] teclas = { Key.D, Key.F, Key.J, Key.K };
         for (int i = 0; i < 4; i++)
         {
-            if (kb[teclas[i]].wasPressedThisFrame) Cambiar(i, true, Ahora);
-            if (kb[teclas[i]].wasReleasedThisFrame) Cambiar(i, false, Ahora);
+            if (kb[teclas[i]].wasPressedThisFrame) Cambiar(i, true, Ahora, "Teclado");
+            if (kb[teclas[i]].wasReleasedThisFrame) Cambiar(i, false, Ahora, "Teclado");
         }
         if (kb.leftArrowKey.wasPressedThisFrame || kb.upArrowKey.wasPressedThisFrame) Navegacion = -1;
         if (kb.rightArrowKey.wasPressedThisFrame || kb.downArrowKey.wasPressedThisFrame) Navegacion = 1;
@@ -311,8 +315,8 @@ public class ArduinoInput : MonoBehaviour
         KeyCode[] teclas = { KeyCode.D, KeyCode.F, KeyCode.J, KeyCode.K };
         for (int i = 0; i < 4; i++)
         {
-            if (Input.GetKeyDown(teclas[i])) Cambiar(i, true, Ahora);
-            if (Input.GetKeyUp(teclas[i])) Cambiar(i, false, Ahora);
+            if (Input.GetKeyDown(teclas[i])) Cambiar(i, true, Ahora, "Teclado");
+            if (Input.GetKeyUp(teclas[i])) Cambiar(i, false, Ahora, "Teclado");
         }
         if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.UpArrow)) Navegacion = -1;
         if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.DownArrow)) Navegacion = 1;
@@ -320,10 +324,14 @@ public class ArduinoInput : MonoBehaviour
 #endif
     }
 
-    void Cambiar(int carril, bool abajo, double t)
+    static readonly string[] nombresBoton = { "B1 (verde)", "B2 (rojo)", "B3 (amarillo)", "B4 (azul)" };
+
+    void Cambiar(int carril, bool abajo, double t, string origen)
     {
         if (Presionado[carril] == abajo) return;
         Presionado[carril] = abajo;
+        if (mostrarBotonesEnConsola)
+            UnityEngine.Debug.Log($"[PianoHero] {nombresBoton[carril]} {(abajo ? "PRESIONADO" : "soltado")}  -  {origen}");
         if (abajo) OnPress?.Invoke(carril, t);
         else OnRelease?.Invoke(carril, t);
     }

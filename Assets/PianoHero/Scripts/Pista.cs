@@ -40,6 +40,12 @@ public class Pista : MonoBehaviour
     public int TotalNotas => notas.Count;
     public float UltimoTiempo { get; private set; }
     public bool Terminada => siguiente >= notas.Count && activas.Count == 0;
+    /// <summary>Muestra u oculta los 4 botones (circulos) de la pista. En el menu se ocultan.</summary>
+    public void MostrarBotones(bool visible)
+    {
+        foreach (var b in botones) if (b != null && b.gameObject.activeSelf != visible) b.gameObject.SetActive(visible);
+    }
+
     /// <summary>true mientras el jugador esta sosteniendo alguna nota larga.</summary>
     public bool HaySostenida
     {

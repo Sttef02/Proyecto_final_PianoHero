@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -40,6 +41,10 @@ public class GameFlow : MonoBehaviour
     public ArduinoInput entrada;
     public Conductor conductor;
     public Pista pista;
+    [Tooltip("Puntaje del juego y resultados (Canvas). Se crea solo si esta vacio.")]
+    public PianoHeroUI ui;
+    [Tooltip("Fuente del puntaje y resultados. Vacio = la misma de los textos del menu (BoldPixels).")]
+    public TMP_FontAsset fuenteHud;
 
     [Header("UI Menu (Canvas)")]
     [Tooltip("Panel que contiene todo el menu. Se oculta al jugar.")]
@@ -71,10 +76,7 @@ public class GameFlow : MonoBehaviour
     // Partida
     SongData cancion;
     float puntos;
-    int racha, rachaMax, perfectos, buenos, fallos;
-    string popup = "";
-    Color popupColor;
-    float popupHasta;
+    int racha, rachaMax, perfectos, buenos, fallos, multAnterior = 1;
 
     GrabadorChart grabador;
 
@@ -88,6 +90,9 @@ public class GameFlow : MonoBehaviour
         if (conductor == null) conductor = gameObject.AddComponent<Conductor>();
         if (pista == null) pista = FindFirstObjectByType<Pista>();
         if (pista == null) pista = new GameObject("Pista").AddComponent<Pista>();
+        if (ui == null) ui = gameObject.AddComponent<PianoHeroUI>();
+        ui.Construir(BuscarFuente(), pista.colores);
+        RepararListaCanciones();
 
         entrada.OnPress += AlPresionar;
         entrada.OnRelease += AlSoltar;
@@ -96,6 +101,68 @@ public class GameFlow : MonoBehaviour
 
         IrAlMenu();
     }
+
+    /// <summary>
+    /// Si en la escena falta algun texto de la lista (espacio vacio en textosCanciones), los toma
+    /// de los hijos de ListaCanciones (Cancion1, Cancion2...). Ademas deja cada cancion en una sola
+    /// linea que se achica si no cabe, para que no se monten entre ellas ni sobre las instrucciones.
+    /// </summary>
+    void RepararListaCanciones()
+    {
+        if (textosCanciones == null) textosCanciones = new TMP_Text[0];
+        bool faltan = textosCanciones.Length == 0 || System.Array.Exists(textosCanciones, t => t == null);
+        if (faltan)
+        {
+            Transform lista = null;
+            foreach (var t in textosCanciones) if (t != null) { lista = t.transform.parent; break; }
+            if (lista == null && panelMenu != null)
+                foreach (var tr in panelMenu.GetComponentsInChildren<Transform>(true))
+                    if (tr.name == "ListaCanciones") { lista = tr; break; }
+            if (lista != null)
+            {
+                var hijos = new List<TMP_Text>();
+                foreach (Transform h in lista)
+                {
+                    var t = h.GetComponent<TMP_Text>();
+                    if (t != null) hijos.Add(t);
+                }
+                hijos.Sort((a, b) => string.CompareOrdinal(a.name, b.name));   // Cancion1, Cancion2, ...
+                textosCanciones = hijos.ToArray();
+            }
+        }
+        foreach (var t in textosCanciones)
+        {
+            if (t == null) continue;
+            t.textWrappingMode = TextWrappingModes.NoWrap;
+            t.overflowMode = TextOverflowModes.Ellipsis;
+            t.fontSizeMax = t.fontSize;
+            t.fontSizeMin = Mathf.Min(18f, t.fontSize);
+            t.enableAutoSizing = true;
+        }
+    }
+
+    TMP_FontAsset BuscarFuente()
+    {
+        if (fuenteHud != null) return fuenteHud;
+        if (textosCanciones != null)
+            foreach (var t in textosCanciones) if (t != null && t.font != null) return t.font;
+        foreach (var t in new[] { textoLatencia, textoConexion, textoPerilla })
+            if (t != null && t.font != null) return t.font;
+        return null;
+    }
+
+    /// <summary>"FACIL", "MEDIA" o "EXPERTO" segun el nombre del archivo de la cancion (ej. InstantCrush_Media).</summary>
+    static string NombreDificultad(SongData s)
+    {
+        string n = PianoHeroUI.Limpiar(s != null ? s.name : "");
+        if (n.EndsWith("_FACIL")) return "FACIL";
+        if (n.EndsWith("_EXPERTO")) return "EXPERTO";
+        if (n.EndsWith("_MEDIA")) return "MEDIA";
+        return "";
+    }
+
+    static Color ColorDificultad(string d) =>
+        d == "FACIL" ? PianoHeroUI.ColorFacil : d == "EXPERTO" ? PianoHeroUI.ColorExperto : PianoHeroUI.ColorMedia;
 
     void OnDestroy()
     {
@@ -107,6 +174,8 @@ public class GameFlow : MonoBehaviour
     void IrAlMenu()
     {
         EstadoActual = Estado.Menu;
+        pista.MostrarBotones(false);   // los circulos de la pista no deben verse detras del menu
+        ui.Ocultar();
         pista.Limpiar();
         entrada.SetLeds(0);
         ultimoPot = -1f;
@@ -134,10 +203,12 @@ public class GameFlow : MonoBehaviour
 
         pista.velocidad = 14f * Mathf.Max(0.3f, cancion.velocidad);
         pista.Cargar(chart, cancion.offsetExtra);
-        puntos = 0; racha = rachaMax = perfectos = buenos = fallos = 0;
+        puntos = 0; racha = rachaMax = perfectos = buenos = fallos = 0; multAnterior = 1;
         entrada.SetLeds(0);
         conductor.Iniciar(cancion.audio, esperaInicial);
         EstadoActual = Estado.Jugando;
+        pista.MostrarBotones(true);
+        ui.MostrarJuego();
     }
 
     void Grabar()
@@ -152,6 +223,8 @@ public class GameFlow : MonoBehaviour
         entrada.SetLeds(0);
         conductor.Iniciar(cancion.audio, esperaInicial);
         EstadoActual = Estado.Grabando;
+        pista.MostrarBotones(true);
+        ui.Ocultar();
     }
 
     void TerminarGrabacion()
@@ -168,6 +241,14 @@ public class GameFlow : MonoBehaviour
         conductor.Detener();
         entrada.SetLeds(0);
         EstadoActual = Estado.Resultados;
+
+        // Record por cancion y dificultad (se guarda en el PC)
+        string clave = "PianoHero.Record." + cancion.name;
+        bool record = puntos > 0 && puntos > PlayerPrefs.GetFloat(clave, 0f);
+        if (record) { PlayerPrefs.SetFloat(clave, puntos); PlayerPrefs.Save(); }
+
+        string dif = NombreDificultad(cancion);
+        ui.Resultados(cancion.titulo, dif, ColorDificultad(dif), puntos, perfectos, buenos, fallos, rachaMax, record);
     }
 
     // ------------------------------------------------------------------ Entrada
@@ -225,6 +306,13 @@ public class GameFlow : MonoBehaviour
                 break;
         }
         rachaMax = Mathf.Max(rachaMax, racha);
+
+        int m = Multiplicador;
+        if (j != Juicio.Fallo && m > multAnterior)
+            ui.Aviso(m >= 4 ? "MULTIPLICADOR X4 - AL MAXIMO!" : "MULTIPLICADOR X" + m + "!",
+                     m >= 4 ? PianoHeroUI.ColorExperto : m == 3 ? PianoHeroUI.ColorMedia : PianoHeroUI.ColorFacil);
+        multAnterior = m;
+        if (racha == rachaParpadeo) ui.Aviso("RACHA DE " + racha + "!", PianoHeroUI.ColorMedia);
         ActualizarLeds();
     }
 
@@ -252,6 +340,7 @@ public class GameFlow : MonoBehaviour
             {
                 double t = conductor.Tiempo;
                 pista.Actualizar(t, entrada.Presionado);
+                ActualizarHud(t);
                 bool fin = t > conductor.Duracion + 0.5f || (pista.Terminada && t > pista.UltimoTiempo + 3f);
                 if (fin) TerminarPartida();
                 else if (QuiereSalir()) IrAlMenu();
@@ -422,15 +511,19 @@ public class GameFlow : MonoBehaviour
         mensajeHasta = Time.time + segundos;
     }
 
-    void Popup(string texto, Color c)
+    void Popup(string texto, Color c) => ui.Popup(texto, c);
+
+    void ActualizarHud(double t)
     {
-        popup = texto;
-        popupColor = c;
-        popupHasta = Time.time + 0.4f;
+        int leds = Mathf.Min(4, racha / notasPorLed);
+        float prog = conductor.Duracion > 0 ? (float)(t / conductor.Duracion) : 0f;
+        string dif = NombreDificultad(cancion);
+        ui.Hud(puntos, racha, Multiplicador, leds, racha >= rachaParpadeo, cancion.titulo, dif, ColorDificultad(dif), prog, t);
     }
 
-    // ------------------------------------------------------------------ HUD (OnGUI)
-    // El menu ahora vive en el Canvas. Jugando, Grabando y Resultados siguen en OnGUI.
+    // ------------------------------------------------------------------ OnGUI
+    // El menu, el puntaje del juego y los resultados viven en el Canvas (PianoHeroUI).
+    // Aqui solo quedan el aviso de grabacion de charts (herramienta del equipo) y los mensajes.
 
     GUIStyle sTitulo, sTexto, sGrande, sChico;
 
@@ -464,35 +557,6 @@ public class GameFlow : MonoBehaviour
                 break;
             }
 
-            case Estado.Jugando:
-            {
-                GUI.Label(new Rect(30 * k, 20 * k, 600 * k, 60 * k), $"{puntos:N0}", new GUIStyle(sTexto) { alignment = TextAnchor.MiddleLeft, fontSize = (int)(48 * k) });
-                GUI.Label(new Rect(30 * k, 80 * k, 600 * k, 50 * k), $"Racha {racha}   x{Multiplicador}", new GUIStyle(sTexto) { alignment = TextAnchor.MiddleLeft });
-
-                // Medidor de racha (espejo de los LEDs)
-                for (int i = 0; i < 4; i++)
-                {
-                    bool on = racha >= rachaParpadeo ? (Time.time * 8f % 2f) < 1f : i < racha / notasPorLed;
-                    Caja(new Rect(30 * k + i * 50 * k, 140 * k, 40 * k, 20 * k), on ? new Color(1f, 0.8f, 0.2f) : new Color(1, 1, 1, 0.15f));
-                }
-
-                float prog = conductor.Duracion > 0 ? Mathf.Clamp01((float)conductor.Tiempo / conductor.Duracion) : 0;
-                Caja(new Rect(0, H - 8 * k, W, 8 * k), new Color(1, 1, 1, 0.15f));
-                Caja(new Rect(0, H - 8 * k, W * prog, 8 * k), new Color(1f, 0.6f, 0.1f));
-
-                if (conductor.Tiempo < 0)
-                    GUI.Label(new Rect(0, H * 0.3f, W, 100 * k), Mathf.CeilToInt((float)-conductor.Tiempo).ToString(), sGrande);
-
-                if (Time.time < popupHasta)
-                {
-                    var st = new GUIStyle(sTitulo);
-                    st.normal.textColor = popupColor;
-                    GUI.Label(new Rect(0, H * 0.35f, W, 90 * k), popup, st);
-                }
-                GUI.Label(new Rect(W - 520 * k, 20 * k, 500 * k, 40 * k), cancion.titulo, new GUIStyle(sTexto) { alignment = TextAnchor.MiddleRight, fontSize = (int)(26 * k) });
-                break;
-            }
-
             case Estado.Grabando:
             {
                 Caja(new Rect(0, 0, W, 130 * k), new Color(0.6f, 0, 0, 0.6f));
@@ -504,19 +568,6 @@ public class GameFlow : MonoBehaviour
                 break;
             }
 
-            case Estado.Resultados:
-            {
-                Caja(new Rect(0, 0, W, H), new Color(0, 0, 0, 0.8f));
-                int total = perfectos + buenos + fallos;
-                float precision = total > 0 ? (perfectos + buenos) * 100f / total : 0;
-                GUI.Label(new Rect(0, 120 * k, W, 90 * k), cancion.titulo, sTitulo);
-                GUI.Label(new Rect(0, 260 * k, W, 100 * k), $"{puntos:N0}", sGrande);
-                GUI.Label(new Rect(0, 400 * k, W, 50 * k), $"Precision: {precision:0.0}%", sTexto);
-                GUI.Label(new Rect(0, 460 * k, W, 50 * k), $"Perfectos: {perfectos}   Bien: {buenos}   Fallos: {fallos}", sTexto);
-                GUI.Label(new Rect(0, 520 * k, W, 50 * k), $"Racha maxima: {rachaMax}", sTexto);
-                GUI.Label(new Rect(0, H - 160 * k, W, 50 * k), "B1 o clic para volver al menu", sTexto);
-                break;
-            }
         }
 
         if (Time.time < mensajeHasta)
