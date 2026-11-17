@@ -5,7 +5,6 @@ using UnityEngine;
 public class ScoreTracker
 {
     public const int MaxMultiplier = 4;
-    const int LedCount = 4;
     const int PerfectPoints = 100;
     const int GoodPoints = 50;
     const float SustainPointsPerSecond = 50f;
@@ -28,7 +27,7 @@ public class ScoreTracker
     public int Misses { get; private set; }
 
     public int Multiplier => 1 + Mathf.Min(MaxMultiplier - 1, Streak / NotesPerStep);
-    public int LitLeds => Mathf.Min(LedCount, Streak / NotesPerStep);
+    public int LitLeds => Mathf.Min(ArduinoInput.LedCount, Streak / NotesPerStep);
     public bool IsStarMode => Streak >= starStreak;
     public int LedCommand => IsStarMode ? ArduinoInput.StarModeLedCommand : LitLeds;
 

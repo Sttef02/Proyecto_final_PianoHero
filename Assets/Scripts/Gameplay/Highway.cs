@@ -112,6 +112,7 @@ public class Highway : MonoBehaviour
 
     public bool TryHit(int lane, double songTime)
     {
+        if (!ArduinoInput.IsValidLane(lane)) return false;
         HighwayNote target = FindClosestNote(lane, songTime, out double distance);
         if (target == null) return false;
 

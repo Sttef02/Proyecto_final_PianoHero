@@ -28,7 +28,6 @@ public class ResultsView
     const float RecordBlinkRate = 3f;
     const float RecordBlinkOn = 1.4f;
     const float FooterAppearAt = 1.4f;
-    const float BlinkPeriod = 2f;
     const string GradeLetterS = "S";
     const string GradeLetterA = "A";
     const string GradeLetterB = "B";
@@ -84,8 +83,7 @@ public class ResultsView
         string grade = Grade(accuracy);
 
         titleText.text = TextFormat.ForPixelFont(data.Title);
-        difficultyText.text = TextFormat.DifficultyLabel(data.Difficulty);
-        difficultyText.color = Palette.ForDifficulty(data.Difficulty);
+        UiFactory.ShowDifficulty(difficultyText, data.Difficulty);
         gradeText.text = grade;
         gradeText.color = GradeColor(grade);
         statsText.text =
@@ -114,7 +112,7 @@ public class ResultsView
         float gradeScale = gradeProgress <= 0f ? 0f : Mathf.Lerp(GradePopScale, 1f, gradeProgress);
         gradeText.rectTransform.localScale = Vector3.one * gradeScale;
 
-        bool blinkOn = now * RecordBlinkRate % BlinkPeriod < RecordBlinkOn;
+        bool blinkOn = UiFactory.IsBlinkOn(now, RecordBlinkRate, RecordBlinkOn);
         recordText.gameObject.SetActive(isNewRecord && elapsed > RecordAppearAt && blinkOn);
         footerText.alpha = elapsed > FooterAppearAt ? 1f : 0f;
     }

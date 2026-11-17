@@ -16,23 +16,25 @@ public struct HudState
     public double SongTime;
 }
 
+struct PopAnimation
+{
+    public float VisibleSeconds;
+    public float HoldSeconds;
+    public float PopSeconds;
+    public float PopScale;
+}
+
 public class PlayView
 {
-    const float JudgementVisibleSeconds = 0.5f;
-    const float JudgementHoldSeconds = 0.3f;
-    const float JudgementPopSeconds = 0.12f;
-    const float JudgementPopScale = 1.45f;
-    const float NoticeVisibleSeconds = 1.2f;
-    const float NoticeHoldSeconds = 0.9f;
-    const float NoticePopSeconds = 0.15f;
-    const float NoticePopScale = 1.3f;
+    static readonly PopAnimation JudgementPop = new PopAnimation { VisibleSeconds = 0.5f, HoldSeconds = 0.3f, PopSeconds = 0.12f, PopScale = 1.45f };
+    static readonly PopAnimation NoticePop = new PopAnimation { VisibleSeconds = 1.2f, HoldSeconds = 0.9f, PopSeconds = 0.15f, PopScale = 1.3f };
+
     const float CountdownPulse = 0.35f;
     const float CountdownMinAlpha = 0.2f;
     const float GoSeconds = 0.6f;
     const float GoGrowth = 0.4f;
     const float StarBlinkRate = 8f;
-    const float BlinkPeriod = 2f;
-    const float BlinkOnTime = 1f;
+    const float StarBlinkOnTime = 1f;
     const float NeverShown = -10f;
     const string GoText = "YA!";
     const string ScoreCaption = "PUNTOS";
@@ -95,8 +97,7 @@ public class PlayView
     {
         RefreshScore(state);
         titleText.text = TextFormat.ForPixelFont(state.Title);
-        difficultyText.text = TextFormat.DifficultyLabel(state.Difficulty);
-        difficultyText.color = Palette.ForDifficulty(state.Difficulty);
+        UiFactory.ShowDifficulty(difficultyText, state.Difficulty);
         progressFill.anchorMax = new Vector2(Mathf.Clamp01(state.Progress), 1f);
         RefreshCountdown(state.SongTime);
     }
@@ -117,8 +118,8 @@ public class PlayView
 
     public void Animate(float now)
     {
-        AnimatePop(judgementText, now - judgementShownAt, JudgementVisibleSeconds, JudgementHoldSeconds, JudgementPopSeconds, JudgementPopScale);
-        AnimatePop(noticeText, now - noticeShownAt, NoticeVisibleSeconds, NoticeHoldSeconds, NoticePopSeconds, NoticePopScale);
+        AnimatePop(judgementText, now - judgementShownAt, JudgementPop);
+        AnimatePop(noticeText, now - noticeShownAt, NoticePop);
     }
 
     void RefreshScore(HudState state)
@@ -128,7 +129,7 @@ public class PlayView
         multiplierText.text = MultiplierLabel + state.Multiplier;
         multiplierBox.color = Palette.ForMultiplier(state.Multiplier);
 
-        bool blinkOn = Time.unscaledTime * StarBlinkRate % BlinkPeriod < BlinkOnTime;
+        bool blinkOn = UiFactory.IsBlinkOn(Time.unscaledTime, StarBlinkRate, StarBlinkOnTime);
         for (int i = 0; i < leds.Count; i++)
         {
             bool lit = state.StarMode ? blinkOn : i < state.LitLeds;
@@ -161,15 +162,17 @@ public class PlayView
     }
 
     // Aparece grande, vuelve a su tamano y se desvanece.
-    static void AnimatePop(TMP_Text label, float elapsed, float visible, float hold, float pop, float popScale)
+    static void AnimatePop(TMP_Text label, float elapsed, PopAnimation animation)
     {
-        if (elapsed >= visible)
+        if (elapsed >= animation.VisibleSeconds)
         {
             label.alpha = 0f;
             return;
         }
-        label.rectTransform.localScale = Vector3.one * (elapsed < pop ? Mathf.Lerp(popScale, 1f, elapsed / pop) : 1f);
-        label.alpha = elapsed < hold ? 1f : 1f - (elapsed - hold) / (visible - hold);
+        float scale = elapsed < animation.PopSeconds ? Mathf.Lerp(animation.PopScale, 1f, elapsed / animation.PopSeconds) : 1f;
+        label.rectTransform.localScale = Vector3.one * scale;
+        float fadeSeconds = animation.VisibleSeconds - animation.HoldSeconds;
+        label.alpha = elapsed < animation.HoldSeconds ? 1f : 1f - (elapsed - animation.HoldSeconds) / fadeSeconds;
     }
 
     void BuildScoreCard(UiFactory ui)
@@ -179,7 +182,7 @@ public class PlayView
         scoreText = ui.Label(card, "Score", ScoreFontSize, Color.white, TextAlignmentOptions.TopLeft, ScoreLayout);
         streakText = ui.Label(card, "Streak", StreakFontSize, Color.white, TextAlignmentOptions.TopLeft, StreakLayout);
 
-        for (int i = 0; i < ArduinoInput.LaneCount; i++)
+        for (int i = 0; i < ArduinoInput.LedCount; i++)
         {
             Image led = ui.Box(card, "Led" + i, Palette.LedOff);
             Layout.At(Layout.TopLeft, FirstLedPosition + LedSpacing * i, LedSize).ApplyTo(led.rectTransform);

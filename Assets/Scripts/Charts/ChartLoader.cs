@@ -10,12 +10,13 @@ public static class ChartLoader
     const string ProjectFolder = "PianoHero";
     const string ChartsFolder = "Charts";
     const char InvalidCharReplacement = '_';
+    static readonly char[] LeadingJunk = { ByteOrderMark, ' ', '\r', '\n', '\t' };
 
     public static ChartData Load(TextAsset file, string chartDifficulty)
     {
         if (file == null || string.IsNullOrWhiteSpace(file.text)) return null;
 
-        string text = file.text.TrimStart(ByteOrderMark, ' ', '\r', '\n', '\t');
+        string text = file.text.TrimStart(LeadingJunk);
         try
         {
             ChartData chart = text.StartsWith(JsonStart)

@@ -8,8 +8,9 @@
 //   PC -> Arduino: "L0".."L4" LEDs encendidos, "L5" los cuatro parpadeando, "?" reenviar estado.
 
 const byte BUTTON_COUNT = 4;
+const byte LED_COUNT = 4;
 const byte BUTTON_PINS[BUTTON_COUNT] = {6, 7, 8, 9};   // verde, rojo, amarillo, azul
-const byte LED_PINS[BUTTON_COUNT] = {2, 3, 4, 5};      // se encienden en este orden
+const byte LED_PINS[LED_COUNT] = {2, 3, 4, 5};         // se encienden en este orden
 const byte KNOB_PIN = A0;
 
 // Con resistencia externa a tierra los botones leen HIGH al presionar. Si se conectan directo a GND, poner true.
@@ -39,6 +40,9 @@ const char HEARTBEAT = 'H';
 const char LED_COMMAND = 'L';
 const char STATUS_REQUEST = '?';
 const char FIRST_DIGIT = '0';
+const char LINE_FEED = '\n';
+const char CARRIAGE_RETURN = '\r';
+const byte FIRST_BUTTON_NUMBER = 1;
 const byte COMMAND_VALUE_INDEX = 1;
 const byte MIN_LED_COMMAND_LENGTH = 2;
 const byte COMMAND_BUFFER_SIZE = 8;
@@ -79,7 +83,7 @@ bool isButtonDown(byte button) {
 
 void sendButton(byte button) {
   Serial.print(BUTTON_PREFIX);
-  Serial.print(button + 1);
+  Serial.print(button + FIRST_BUTTON_NUMBER);
   Serial.print(BUTTON_SEPARATOR);
   Serial.println(pressed[button] ? PRESSED_FLAG : RELEASED_FLAG);
 }
@@ -91,10 +95,8 @@ void sendKnob() {
 }
 
 void setupPins() {
-  for (byte i = 0; i < BUTTON_COUNT; i++) {
-    pinMode(BUTTON_PINS[i], USE_INTERNAL_PULLUP ? INPUT_PULLUP : INPUT);
-    pinMode(LED_PINS[i], OUTPUT);
-  }
+  for (byte i = 0; i < BUTTON_COUNT; i++) pinMode(BUTTON_PINS[i], USE_INTERNAL_PULLUP ? INPUT_PULLUP : INPUT);
+  for (byte i = 0; i < LED_COUNT; i++) pinMode(LED_PINS[i], OUTPUT);
   delay(SETTLE_MS);
   for (byte i = 0; i < BUTTON_COUNT; i++) {
     idleLevel[i] = digitalRead(BUTTON_PINS[i]);
@@ -104,12 +106,12 @@ void setupPins() {
 }
 
 void playStartupSweep() {
-  for (byte i = 0; i < BUTTON_COUNT; i++) {
+  for (byte i = 0; i < LED_COUNT; i++) {
     digitalWrite(LED_PINS[i], HIGH);
     delay(STARTUP_SWEEP_MS);
   }
   delay(STARTUP_PAUSE_MS);
-  for (byte i = 0; i < BUTTON_COUNT; i++) digitalWrite(LED_PINS[i], LOW);
+  for (byte i = 0; i < LED_COUNT; i++) digitalWrite(LED_PINS[i], LOW);
 }
 
 void setup() {
@@ -154,11 +156,11 @@ void sendHeartbeat(unsigned long nowMs) {
 void runCommand() {
   if (command[0] == LED_COMMAND && commandLength >= MIN_LED_COMMAND_LENGTH) {
     int value = command[COMMAND_VALUE_INDEX] - FIRST_DIGIT;
-    if (value >= 0 && value <= BUTTON_COUNT) {
+    if (value >= 0 && value <= LED_COUNT) {
       litLeds = value;
       blinking = false;
     } else if (value == BLINK_COMMAND) {
-      litLeds = BUTTON_COUNT;
+      litLeds = LED_COUNT;
       blinking = true;
     }
   } else if (command[0] == STATUS_REQUEST) {
@@ -170,7 +172,7 @@ void runCommand() {
 void readCommands() {
   while (Serial.available()) {
     char received = Serial.read();
-    if (received == '\n' || received == '\r') {
+    if (received == LINE_FEED || received == CARRIAGE_RETURN) {
       if (commandLength > 0) {
         command[commandLength] = 0;
         runCommand();
@@ -187,7 +189,7 @@ void updateLeds(unsigned long nowMs) {
     lastBlinkMs = nowMs;
     blinkOn = !blinkOn;
   }
-  for (byte i = 0; i < BUTTON_COUNT; i++) {
+  for (byte i = 0; i < LED_COUNT; i++) {
     bool on = blinking ? blinkOn : i < litLeds;
     digitalWrite(LED_PINS[i], on ? HIGH : LOW);
   }

@@ -13,6 +13,7 @@ public class UiFactory
     const float SpritePixelsPerUnit = 100f;
     const float SlicedPixelsPerUnitMultiplier = 1.6f;
     const float BorderThickness = 3f;
+    const float BlinkPeriod = 2f;
     const float PixelCenter = 0.5f;
     const byte Opaque = 255;
     static readonly Color32 OutlineColor = new Color32(0, 0, 0, Opaque);
@@ -94,6 +95,15 @@ public class UiFactory
         layout.ApplyTo(label.rectTransform);
         return label;
     }
+
+    public static void ShowDifficulty(TMP_Text label, Difficulty difficulty)
+    {
+        label.text = TextFormat.DifficultyLabel(difficulty);
+        label.color = Palette.ForDifficulty(difficulty);
+    }
+
+    // Parpadeo regular: encendido durante onTime de cada ciclo de BlinkPeriod.
+    public static bool IsBlinkOn(float time, float rate, float onTime) => time * rate % BlinkPeriod < onTime;
 
     public static void Outline(TMP_Text label, float width)
     {

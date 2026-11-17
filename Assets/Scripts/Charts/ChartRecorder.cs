@@ -20,12 +20,12 @@ public class ChartRecorder
 
     public void Press(int lane, double songTime)
     {
-        if (songTime >= 0.0) pressStart[lane] = songTime;
+        if (ArduinoInput.IsValidLane(lane) && songTime >= 0.0) pressStart[lane] = songTime;
     }
 
     public void Release(int lane, double songTime)
     {
-        if (pressStart[lane] == NotPressed) return;
+        if (!ArduinoInput.IsValidLane(lane) || pressStart[lane] == NotPressed) return;
 
         double held = songTime - pressStart[lane];
         notes.Add(new ChartNote

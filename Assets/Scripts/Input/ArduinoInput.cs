@@ -5,6 +5,7 @@ using UnityEngine;
 public class ArduinoInput : MonoBehaviour
 {
     public const int LaneCount = 4;
+    public const int LedCount = 4;
     public const int StarModeLedCommand = 5;
 
     const string ArduinoSource = "Arduino";
@@ -98,13 +99,15 @@ public class ArduinoInput : MonoBehaviour
 
     void SetPressed(int lane, bool down, double time, string source)
     {
-        if (Pressed[lane] == down) return;
+        if (!IsValidLane(lane) || Pressed[lane] == down) return;
         Pressed[lane] = down;
         if (logButtons) Debug.Log($"{LogPrefix}{ButtonNames[lane]} {(down ? "PRESIONADO" : "soltado")}  -  {source}");
 
         if (down) ButtonPressed?.Invoke(lane, time);
         else ButtonReleased?.Invoke(lane, time);
     }
+
+    public static bool IsValidLane(int lane) => lane >= 0 && lane < LaneCount;
 
     void OnDestroy() => serial?.Close();
 

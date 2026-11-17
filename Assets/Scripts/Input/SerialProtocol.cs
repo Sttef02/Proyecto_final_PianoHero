@@ -43,7 +43,7 @@ public static class SerialProtocol
         if (line.Length < ButtonLineLength || line[0] != ButtonPrefix || line[ButtonSeparatorIndex] != ButtonSeparator) return false;
 
         int button = line[ButtonNumberIndex] - FirstButtonNumber;
-        if (button < 0 || button >= ArduinoInput.LaneCount) return false;
+        if (!ArduinoInput.IsValidLane(button)) return false;
 
         message.Type = SerialMessageType.Button;
         message.Index = button;
