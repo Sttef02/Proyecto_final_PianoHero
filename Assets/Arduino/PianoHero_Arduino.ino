@@ -1,43 +1,16 @@
-// =====================================================================
-//  PianoHero - Control con Arduino Uno
-//  4 botones (carriles), 1 potenciometro (seleccion de cancion),
-//  4 LEDs (racha).
-//
-//  Protocolo serial (115200 baudios, un mensaje por linea):
-//    Arduino -> PC:
-//      "READY"        al arrancar
-//      "B1:1"/"B1:0"  boton 1 presionado / soltado  (B1..B4)
-//      "P:734"        valor del potenciometro (0-1023), solo cuando cambia
-//      "H"            latido cada 1 s (para que Unity sepa que esta conectado)
-//    PC -> Arduino:
-//      "L0".."L4"     cuantos LEDs encender (de izquierda a derecha)
-//      "L5"           los 4 LEDs parpadeando (racha maxima)
-//      "?"            reenviar estado de botones y potenciometro
-// =====================================================================
-
-// ================== CONFIGURA AQUI TUS PINES ==================
-// Orden: carril 1 (verde), 2 (rojo), 3 (amarillo), 4 (azul)
 const byte PINES_BOTON[4] = {6, 7, 8, 9};
-// Orden: LED 1 (se enciende primero) ... LED 4 (ultimo)
 const byte PINES_LED[4]   = {2, 3, 4, 5};
 const byte PIN_POT = A0;
-
-// Tus botones tienen resistencia externa (pull-down): leen HIGH al presionar.
-// Si algun dia conectas los botones directo a GND sin resistencia, pon true.
 const bool USAR_PULLUP_INTERNO = false;
-
-// Pon true, sube el sketch y abre el Monitor Serie (115200) para ver
-// que pin cambia al presionar cada boton. Luego vuelve a false.
 const bool MODO_DIAGNOSTICO = false;
-// ===============================================================
 
-const unsigned long DEBOUNCE_US = 8000;   // 8 ms: rapido para juego de ritmo
-const int UMBRAL_POT = 6;                  // cambio minimo para reenviar
+const unsigned long DEBOUNCE_US = 8000;
+const int UMBRAL_POT = 6;
 const unsigned long INTERVALO_POT_MS = 15;
 const unsigned long INTERVALO_PARPADEO_MS = 120;
 
 bool estado[4];
-bool reposo[4];   // lectura del pin con el boton suelto (se mide al encender)
+bool reposo[4];
 unsigned long ultimoCambio[4];
 
 int potSuavizado = 0;
@@ -53,12 +26,10 @@ unsigned long ultimoParpadeoMs = 0;
 char buffer[8];
 byte bufLen = 0;
 
-// Diagnostico
 int prevPin[14];
 int prevPotDiag = -100;
 
 // Presionado = el pin esta distinto a como estaba en reposo.
-// Asi funciona igual con resistencia a tierra o a 5V. NO presiones botones al encender.
 bool leerBoton(byte i) {
   return digitalRead(PINES_BOTON[i]) != reposo[i];
 }
@@ -84,7 +55,7 @@ void setup() {
     Serial.println(F("=== DIAGNOSTICO 1/2: LEDs ==="));
     Serial.println(F("Mira que LED se enciende con cada pin y anotalo."));
     for (byte p = 2; p <= 13; p++) {
-      // Solo se pone el pin en HIGH (nunca en LOW), asi es seguro aunque sea un boton.
+      // Solo se pone el pin en HIGH, asi es seguro aunque sea un boton.
       digitalWrite(p, HIGH);
       pinMode(p, OUTPUT);
       Serial.print(F("Pin "));
