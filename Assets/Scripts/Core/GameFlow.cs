@@ -18,7 +18,7 @@ public class GameFlow : MonoBehaviour
     const int LatencyUpLane = 2;
     const int RecordLane = 3;
     const string ChartFileSuffix = "_chart";
-    const string HighwayObjectName = "Pista";
+    const string HighwayObjectName = "Highway";
 
     [Header("Canciones")]
     public SongData[] songs;
@@ -27,6 +27,7 @@ public class GameFlow : MonoBehaviour
     [Tooltip("Si es true, presionar sin nota rompe la racha. Recomendado false con botones de protoboard.")]
     public bool penalizeEmptyHits;
     [Tooltip("Segundos de cuenta regresiva antes de que empiece la cancion.")]
+    [Min(0f)]
     public float startDelay = 2.5f;
     public ScoreTracker score = new ScoreTracker();
 
@@ -100,8 +101,6 @@ public class GameFlow : MonoBehaviour
         score.StarStreakReached += ShowStreakNotice;
         menu.SelectionChanged += PlayPreview;
     }
-
-    // ---------------------------------------------------------------- Estados
 
     void UpdateMenu()
     {
@@ -180,7 +179,7 @@ public class GameFlow : MonoBehaviour
     void BeginSong(GameState newState)
     {
         controller.SetLeds(0);
-        conductor.Play(currentSong.audio, startDelay);
+        conductor.Play(currentSong.audio, Mathf.Max(0f, startDelay));
         highway.SetLaneButtonsVisible(true);
         State = newState;
     }
@@ -228,7 +227,10 @@ public class GameFlow : MonoBehaviour
         conductor.Stop();
         string path = ChartLoader.Save(chart, currentSong.title + ChartFileSuffix);
         GoToMenu();
-        hud.ShowMessage($"Chart guardado ({chart.notes.Count} notas): {path}\nArrastralo al campo Chart de la cancion.", SavedChartMessageSeconds);
+        string message = path != null
+            ? $"Chart guardado ({chart.notes.Count} notas): {path}\nArrastralo al campo Chart de la cancion."
+            : "No se pudo guardar el chart. Revisa la Console.";
+        hud.ShowMessage(message, SavedChartMessageSeconds);
     }
 
     bool SongHasEnded(double songTime) =>
@@ -247,8 +249,6 @@ public class GameFlow : MonoBehaviour
         exitHoldTime = 0f;
         return true;
     }
-
-    // ---------------------------------------------------------------- Eventos
 
     void OnButtonPressed(int lane, double clockTime)
     {

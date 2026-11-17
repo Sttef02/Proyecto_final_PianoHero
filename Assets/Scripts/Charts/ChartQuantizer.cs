@@ -3,14 +3,12 @@ using System.Collections.Generic;
 
 public static class ChartQuantizer
 {
-    const double SecondsPerMinute = 60.0;
-
     // Ajusta cada nota a la grilla del BPM para corregir pequenos errores al grabar.
     public static void Quantize(ChartData chart, float bpm, float firstBeatTime, int subdivision)
     {
         if (bpm <= 0f || subdivision <= 0) return;
 
-        double step = SecondsPerMinute / bpm / subdivision;
+        double step = ChartData.SecondsPerMinute / bpm / subdivision;
         var occupied = new HashSet<(long, int)>();
         var quantized = new List<ChartNote>();
         foreach (ChartNote note in chart.notes)

@@ -22,6 +22,11 @@ public class SongMenu
     const float ScrollThreshold = 0.01f;
     const float PointerMoveThreshold = 1f;
     const float PercentScale = 100f;
+    const float SlotCenter = 0.5f;
+    const string LatencyFormat = "Latencia: {0:0} ms  (B2 -10 / B3 +10)";
+    const string KnobFormat = "Perilla: {0:0}%";
+    const string NoKnobText = "Perilla: sin datos";
+    const string ArtistFormat = "{0}  <size=60%>{1}</size>";
     const string SelectedPrefix = "> ";
     const string SelectedSuffix = " <";
 
@@ -91,10 +96,10 @@ public class SongMenu
     public void Render(ArduinoInput controller, float latencyMs)
     {
         RenderSongList();
-        if (latencyText != null) latencyText.text = $"Latencia: {latencyMs:0} ms  (B2 -10 / B3 +10)";
+        if (latencyText != null) latencyText.text = string.Format(LatencyFormat, latencyMs);
         if (connectionText != null) connectionText.text = controller.ConnectionStatus;
         if (knobText != null)
-            knobText.text = controller.HasKnobValue ? $"Perilla: {controller.Knob01 * PercentScale:0}%" : "Perilla: sin datos";
+            knobText.text = controller.HasKnobValue ? string.Format(KnobFormat, controller.Knob01 * PercentScale) : NoKnobText;
         RenderKeyIcons(controller);
     }
 
@@ -106,7 +111,7 @@ public class SongMenu
         // Histeresis: solo cambia si la perilla esta bien dentro de la zona de la cancion.
         float position = Mathf.Clamp(controller.Knob01 * songs.Length, 0f, songs.Length - KnobEdgeMargin);
         int candidate = Mathf.FloorToInt(position);
-        if (candidate != SelectedIndex && Mathf.Abs(position - (candidate + 0.5f)) < KnobHysteresis) SelectedIndex = candidate;
+        if (candidate != SelectedIndex && Mathf.Abs(position - (candidate + SlotCenter)) < KnobHysteresis) SelectedIndex = candidate;
     }
 
     void Step(int direction)
@@ -157,7 +162,7 @@ public class SongMenu
             if (!hasSong) continue;
 
             bool selected = i == SelectedIndex;
-            string line = $"{songs[i].title}  <size=60%>{songs[i].artist}</size>";
+            string line = string.Format(ArtistFormat, songs[i].title, songs[i].artist);
             text.text = selected ? SelectedPrefix + line + SelectedSuffix : line;
             text.color = selected ? selectedColor : normalColor;
         }
@@ -186,7 +191,7 @@ public class SongMenu
             var text = child.GetComponent<TMP_Text>();
             if (text != null) texts.Add(text);
         }
-        texts.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
+        texts.Sort((first, second) => string.CompareOrdinal(first.name, second.name));
         songTexts = texts.ToArray();
     }
 

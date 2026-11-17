@@ -11,8 +11,10 @@ public class ScoreTracker
     const float SustainPointsPerSecond = 50f;
 
     [Tooltip("Notas seguidas para encender cada LED y subir el multiplicador.")]
+    [Min(1)]
     public int notesPerLed = 10;
     [Tooltip("Racha a partir de la cual los 4 LEDs parpadean.")]
+    [Min(1)]
     public int starStreak = 50;
 
     public event Action<int> MultiplierIncreased;
@@ -25,10 +27,12 @@ public class ScoreTracker
     public int Goods { get; private set; }
     public int Misses { get; private set; }
 
-    public int Multiplier => 1 + Mathf.Min(MaxMultiplier - 1, Streak / notesPerLed);
-    public int LitLeds => Mathf.Min(LedCount, Streak / notesPerLed);
+    public int Multiplier => 1 + Mathf.Min(MaxMultiplier - 1, Streak / NotesPerStep);
+    public int LitLeds => Mathf.Min(LedCount, Streak / NotesPerStep);
     public bool IsStarMode => Streak >= starStreak;
     public int LedCommand => IsStarMode ? ArduinoInput.StarModeLedCommand : LitLeds;
+
+    int NotesPerStep => Mathf.Max(1, notesPerLed);
 
     int lastMultiplier = 1;
 

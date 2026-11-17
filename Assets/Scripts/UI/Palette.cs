@@ -23,6 +23,9 @@ public static class Palette
     public static readonly Color Good = new Color(0.4f, 0.9f, 1f);
     public static readonly Color Miss = new Color(1f, 0.3f, 0.3f);
 
+    const int HighMultiplier = 3;
+    const int LowMultiplier = 2;
+
     public static Color ForDifficulty(Difficulty difficulty)
     {
         switch (difficulty)
@@ -36,8 +39,8 @@ public static class Palette
     public static Color ForMultiplier(int multiplier)
     {
         if (multiplier >= ScoreTracker.MaxMultiplier) return Expert;
-        if (multiplier == 3) return Medium;
-        if (multiplier == 2) return Easy;
+        if (multiplier == HighMultiplier) return Medium;
+        if (multiplier == LowMultiplier) return Easy;
         return NeutralMultiplier;
     }
 

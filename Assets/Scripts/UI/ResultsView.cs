@@ -28,6 +28,33 @@ public class ResultsView
     const float RecordBlinkRate = 3f;
     const float RecordBlinkOn = 1.4f;
     const float FooterAppearAt = 1.4f;
+    const float BlinkPeriod = 2f;
+    const string GradeLetterS = "S";
+    const string GradeLetterA = "A";
+    const string GradeLetterB = "B";
+    const string GradeLetterC = "C";
+    const string GradeLetterD = "D";
+    const string NewRecordText = "NUEVO RECORD!";
+    const string FooterText = "B1  O  CLIC  PARA VOLVER AL MENU";
+
+    const float TitleFontSize = 54f;
+    const float DifficultyFontSize = 30f;
+    const float GradeFontSize = 280f;
+    const float ScoreFontSize = 96f;
+    const float RecordFontSize = 36f;
+    const float StatsFontSize = 32f;
+    const float FooterFontSize = 28f;
+    const float GradeOutline = 0.2f;
+    const float StatsLineSpacing = 18f;
+
+    static readonly Vector2 PanelSize = new Vector2(1160f, 860f);
+    static readonly Layout TitleLayout = Layout.TopRow(Layout.TopCenter, new Vector2(0f, -40f), -80f, 70f);
+    static readonly Layout DifficultyLayout = Layout.TopRow(Layout.TopCenter, new Vector2(0f, -112f), -80f, 40f);
+    static readonly Layout GradeLayout = new Layout(Layout.TopLeft, Layout.TopLeft, Layout.Center, new Vector2(250f, -380f), new Vector2(360f, 340f));
+    static readonly Layout ScoreLayout = Layout.TopRow(Layout.TopLeft, new Vector2(470f, -190f), -510f, 110f);
+    static readonly Layout RecordLayout = Layout.TopRow(Layout.TopLeft, new Vector2(474f, -300f), -510f, 46f);
+    static readonly Layout StatsLayout = Layout.TopRow(Layout.TopLeft, new Vector2(474f, -370f), -510f, 330f);
+    static readonly Layout FooterLayout = Layout.BottomRow(new Vector2(0f, 36f), -80f, 40f);
 
     readonly RectTransform root;
     TextMeshProUGUI titleText, difficultyText, gradeText, scoreText, statsText, recordText, footerText;
@@ -38,10 +65,9 @@ public class ResultsView
 
     public ResultsView(UiFactory ui, Transform canvas)
     {
-        root = ui.Group(canvas, "Resultados");
-        UiFactory.Stretch(ui.Box(root, "Oscuro", Palette.Overlay, false).rectTransform, 0f);
-        RectTransform panel = ui.Panel(root, "Panel", Layout.Centered(Vector2.zero, new Vector2(1160f, 860f)),
-                                       Palette.PanelBackground, Palette.Accent);
+        root = ui.Group(canvas, "Results");
+        UiFactory.Stretch(ui.Box(root, "Overlay", Palette.Overlay, false).rectTransform, 0f);
+        RectTransform panel = ui.Panel(root, "Panel", Layout.Centered(Vector2.zero, PanelSize), Palette.PanelBackground, Palette.Accent);
         BuildHeader(ui, panel);
         BuildBody(ui, panel);
     }
@@ -88,7 +114,7 @@ public class ResultsView
         float gradeScale = gradeProgress <= 0f ? 0f : Mathf.Lerp(GradePopScale, 1f, gradeProgress);
         gradeText.rectTransform.localScale = Vector3.one * gradeScale;
 
-        bool blinkOn = now * RecordBlinkRate % 2f < RecordBlinkOn;
+        bool blinkOn = now * RecordBlinkRate % BlinkPeriod < RecordBlinkOn;
         recordText.gameObject.SetActive(isNewRecord && elapsed > RecordAppearAt && blinkOn);
         footerText.alpha = elapsed > FooterAppearAt ? 1f : 0f;
     }
@@ -101,48 +127,41 @@ public class ResultsView
 
     static string Grade(float accuracy)
     {
-        if (accuracy >= GradeS) return "S";
-        if (accuracy >= GradeA) return "A";
-        if (accuracy >= GradeB) return "B";
-        if (accuracy >= GradeC) return "C";
-        return "D";
+        if (accuracy >= GradeS) return GradeLetterS;
+        if (accuracy >= GradeA) return GradeLetterA;
+        if (accuracy >= GradeB) return GradeLetterB;
+        if (accuracy >= GradeC) return GradeLetterC;
+        return GradeLetterD;
     }
 
     static Color GradeColor(string grade)
     {
         switch (grade)
         {
-            case "S": return Palette.Medium;
-            case "A": return Palette.Easy;
-            case "B": return Palette.Accent;
-            case "C": return Palette.GradeC;
+            case GradeLetterS: return Palette.Medium;
+            case GradeLetterA: return Palette.Easy;
+            case GradeLetterB: return Palette.Accent;
+            case GradeLetterC: return Palette.GradeC;
             default: return Palette.Expert;
         }
     }
 
     void BuildHeader(UiFactory ui, RectTransform panel)
     {
-        titleText = ui.Label(panel, "Titulo", 54f, Color.white, TextAlignmentOptions.Center,
-                             Layout.TopRow(Layout.TopCenter, new Vector2(0f, -40f), -80f, 70f));
-        difficultyText = ui.Label(panel, "Dificultad", 30f, Palette.Medium, TextAlignmentOptions.Center,
-                                  Layout.TopRow(Layout.TopCenter, new Vector2(0f, -112f), -80f, 40f));
-        gradeText = ui.Label(panel, "Letra", 280f, Palette.Accent, TextAlignmentOptions.Center,
-                             new Layout(Layout.TopLeft, Layout.TopLeft, Layout.Center, new Vector2(250f, -380f), new Vector2(360f, 340f)));
-        UiFactory.Outline(gradeText, 0.2f);
+        titleText = ui.Label(panel, "Title", TitleFontSize, Color.white, TextAlignmentOptions.Center, TitleLayout);
+        difficultyText = ui.Label(panel, "Difficulty", DifficultyFontSize, Palette.Medium, TextAlignmentOptions.Center, DifficultyLayout);
+        gradeText = ui.Label(panel, "Grade", GradeFontSize, Palette.Accent, TextAlignmentOptions.Center, GradeLayout);
+        UiFactory.Outline(gradeText, GradeOutline);
     }
 
     void BuildBody(UiFactory ui, RectTransform panel)
     {
-        scoreText = ui.Label(panel, "Puntos", 96f, Color.white, TextAlignmentOptions.Left,
-                             Layout.TopRow(Layout.TopLeft, new Vector2(470f, -190f), -510f, 110f));
-        recordText = ui.Label(panel, "Record", 36f, Palette.Medium, TextAlignmentOptions.Left,
-                              Layout.TopRow(Layout.TopLeft, new Vector2(474f, -300f), -510f, 46f));
-        recordText.text = "NUEVO RECORD!";
-        statsText = ui.Label(panel, "Estadisticas", 32f, Color.white, TextAlignmentOptions.TopLeft,
-                             Layout.TopRow(Layout.TopLeft, new Vector2(474f, -370f), -510f, 330f));
-        statsText.lineSpacing = 18f;
-        footerText = ui.Label(panel, "Pie", 28f, Palette.SecondaryText, TextAlignmentOptions.Center,
-                              Layout.BottomRow(new Vector2(0f, 36f), -80f, 40f));
-        footerText.text = "B1  O  CLIC  PARA VOLVER AL MENU";
+        scoreText = ui.Label(panel, "Score", ScoreFontSize, Color.white, TextAlignmentOptions.Left, ScoreLayout);
+        recordText = ui.Label(panel, "Record", RecordFontSize, Palette.Medium, TextAlignmentOptions.Left, RecordLayout);
+        recordText.text = NewRecordText;
+        statsText = ui.Label(panel, "Stats", StatsFontSize, Color.white, TextAlignmentOptions.TopLeft, StatsLayout);
+        statsText.lineSpacing = StatsLineSpacing;
+        footerText = ui.Label(panel, "Footer", FooterFontSize, Palette.SecondaryText, TextAlignmentOptions.Center, FooterLayout);
+        footerText.text = FooterText;
     }
 }

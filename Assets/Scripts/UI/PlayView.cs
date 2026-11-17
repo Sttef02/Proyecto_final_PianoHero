@@ -31,8 +31,41 @@ public class PlayView
     const float GoSeconds = 0.6f;
     const float GoGrowth = 0.4f;
     const float StarBlinkRate = 8f;
+    const float BlinkPeriod = 2f;
+    const float BlinkOnTime = 1f;
     const float NeverShown = -10f;
     const string GoText = "YA!";
+    const string ScoreCaption = "PUNTOS";
+    const string StreakLabel = "RACHA ";
+    const string MultiplierLabel = "X";
+
+    const float CaptionFontSize = 22f;
+    const float ScoreFontSize = 64f;
+    const float StreakFontSize = 28f;
+    const float MultiplierFontSize = 50f;
+    const float SongTitleFontSize = 32f;
+    const float DifficultyFontSize = 26f;
+    const float JudgementFontSize = 92f;
+    const float NoticeFontSize = 48f;
+    const float CountdownFontSize = 230f;
+    const float TextOutline = 0.25f;
+    const float CountdownOutline = 0.3f;
+    const float ProgressBarHeight = 10f;
+
+    static readonly Layout ScoreCardLayout = Layout.At(Layout.TopLeft, new Vector2(28f, -28f), new Vector2(460f, 196f));
+    static readonly Layout ScoreCaptionLayout = Layout.TopRow(Layout.TopLeft, new Vector2(26f, -16f), -40f, 30f);
+    static readonly Layout ScoreLayout = Layout.TopRow(Layout.TopLeft, new Vector2(24f, -44f), -40f, 72f);
+    static readonly Layout StreakLayout = Layout.At(Layout.TopLeft, new Vector2(26f, -122f), new Vector2(260f, 36f));
+    static readonly Vector2 FirstLedPosition = new Vector2(26f, -162f);
+    static readonly Vector2 LedSpacing = new Vector2(62f, 0f);
+    static readonly Vector2 LedSize = new Vector2(54f, 16f);
+    static readonly Layout MultiplierLayout = Layout.At(Layout.BottomRight, new Vector2(-20f, 20f), new Vector2(120f, 84f));
+    static readonly Layout SongCardLayout = Layout.At(Layout.TopRight, new Vector2(-28f, -28f), new Vector2(620f, 112f));
+    static readonly Layout SongTitleLayout = Layout.TopRow(Layout.TopRight, new Vector2(-24f, -14f), -48f, 44f);
+    static readonly Layout DifficultyLayout = Layout.TopRow(Layout.TopRight, new Vector2(-24f, -62f), -48f, 34f);
+    static readonly Layout JudgementLayout = Layout.Centered(new Vector2(0f, 230f), new Vector2(1000f, 120f));
+    static readonly Layout NoticeLayout = Layout.Centered(new Vector2(0f, 140f), new Vector2(1100f, 70f));
+    static readonly Layout CountdownLayout = Layout.Centered(new Vector2(0f, 80f), new Vector2(800f, 300f));
 
     readonly RectTransform root;
     readonly Color[] laneColors;
@@ -47,7 +80,7 @@ public class PlayView
     public PlayView(UiFactory ui, Transform canvas, Color[] laneColors)
     {
         this.laneColors = laneColors;
-        root = ui.Group(canvas, "Juego");
+        root = ui.Group(canvas, "PlayHud");
         BuildScoreCard(ui);
         BuildSongCard(ui);
         BuildProgressBar(ui);
@@ -91,11 +124,11 @@ public class PlayView
     void RefreshScore(HudState state)
     {
         scoreText.text = TextFormat.Points(state.Score);
-        streakText.text = "RACHA " + state.Streak;
-        multiplierText.text = "X" + state.Multiplier;
+        streakText.text = StreakLabel + state.Streak;
+        multiplierText.text = MultiplierLabel + state.Multiplier;
         multiplierBox.color = Palette.ForMultiplier(state.Multiplier);
 
-        bool blinkOn = Time.unscaledTime * StarBlinkRate % 2f < 1f;
+        bool blinkOn = Time.unscaledTime * StarBlinkRate % BlinkPeriod < BlinkOnTime;
         for (int i = 0; i < leds.Count; i++)
         {
             bool lit = state.StarMode ? blinkOn : i < state.LitLeds;
@@ -123,7 +156,7 @@ public class PlayView
         }
         else
         {
-            countdownText.text = "";
+            countdownText.text = string.Empty;
         }
     }
 
@@ -141,43 +174,36 @@ public class PlayView
 
     void BuildScoreCard(UiFactory ui)
     {
-        RectTransform card = ui.Panel(root, "Puntaje", Layout.At(Layout.TopLeft, new Vector2(28f, -28f), new Vector2(460f, 196f)),
-                                      Palette.PanelBackground, Palette.PanelBorder);
-        ui.Label(card, "Titulo", 22f, Palette.SecondaryText, TextAlignmentOptions.TopLeft,
-                 Layout.TopRow(Layout.TopLeft, new Vector2(26f, -16f), -40f, 30f)).text = "PUNTOS";
-        scoreText = ui.Label(card, "Puntos", 64f, Color.white, TextAlignmentOptions.TopLeft,
-                             Layout.TopRow(Layout.TopLeft, new Vector2(24f, -44f), -40f, 72f));
-        streakText = ui.Label(card, "Racha", 28f, Color.white, TextAlignmentOptions.TopLeft,
-                              Layout.At(Layout.TopLeft, new Vector2(26f, -122f), new Vector2(260f, 36f)));
+        RectTransform card = ui.Panel(root, "ScoreCard", ScoreCardLayout, Palette.PanelBackground, Palette.PanelBorder);
+        ui.Label(card, "ScoreTitle", CaptionFontSize, Palette.SecondaryText, TextAlignmentOptions.TopLeft, ScoreCaptionLayout).text = ScoreCaption;
+        scoreText = ui.Label(card, "Score", ScoreFontSize, Color.white, TextAlignmentOptions.TopLeft, ScoreLayout);
+        streakText = ui.Label(card, "Streak", StreakFontSize, Color.white, TextAlignmentOptions.TopLeft, StreakLayout);
 
         for (int i = 0; i < ArduinoInput.LaneCount; i++)
         {
             Image led = ui.Box(card, "Led" + i, Palette.LedOff);
-            Layout.At(Layout.TopLeft, new Vector2(26f + i * 62f, -162f), new Vector2(54f, 16f)).ApplyTo(led.rectTransform);
+            Layout.At(Layout.TopLeft, FirstLedPosition + LedSpacing * i, LedSize).ApplyTo(led.rectTransform);
             leds.Add(led);
         }
 
-        multiplierBox = ui.Box(card, "Multiplicador", Palette.Accent);
-        Layout.At(Layout.BottomRight, new Vector2(-20f, 20f), new Vector2(120f, 84f)).ApplyTo(multiplierBox.rectTransform);
-        multiplierText = ui.Label(multiplierBox.rectTransform, "Valor", 50f, Color.black, TextAlignmentOptions.Center);
+        multiplierBox = ui.Box(card, "Multiplier", Palette.Accent);
+        MultiplierLayout.ApplyTo(multiplierBox.rectTransform);
+        multiplierText = ui.Label(multiplierBox.rectTransform, "Value", MultiplierFontSize, Color.black, TextAlignmentOptions.Center);
     }
 
     void BuildSongCard(UiFactory ui)
     {
-        RectTransform card = ui.Panel(root, "Cancion", Layout.At(Layout.TopRight, new Vector2(-28f, -28f), new Vector2(620f, 112f)),
-                                      Palette.PanelBackground, Palette.PanelBorder);
-        titleText = ui.Label(card, "Titulo", 32f, Color.white, TextAlignmentOptions.Right,
-                             Layout.TopRow(Layout.TopRight, new Vector2(-24f, -14f), -48f, 44f));
-        difficultyText = ui.Label(card, "Dificultad", 26f, Palette.Medium, TextAlignmentOptions.Right,
-                                  Layout.TopRow(Layout.TopRight, new Vector2(-24f, -62f), -48f, 34f));
+        RectTransform card = ui.Panel(root, "SongCard", SongCardLayout, Palette.PanelBackground, Palette.PanelBorder);
+        titleText = ui.Label(card, "Title", SongTitleFontSize, Color.white, TextAlignmentOptions.Right, SongTitleLayout);
+        difficultyText = ui.Label(card, "Difficulty", DifficultyFontSize, Palette.Medium, TextAlignmentOptions.Right, DifficultyLayout);
     }
 
     void BuildProgressBar(UiFactory ui)
     {
-        Image track = ui.Box(root, "Progreso", Palette.ProgressTrack, false);
-        Layout.BottomRow(Vector2.zero, 0f, 10f).ApplyTo(track.rectTransform);
+        Image track = ui.Box(root, "Progress", Palette.ProgressTrack, false);
+        Layout.BottomRow(Vector2.zero, 0f, ProgressBarHeight).ApplyTo(track.rectTransform);
 
-        progressFill = ui.Box(track.rectTransform, "Relleno", Palette.Accent, false).rectTransform;
+        progressFill = ui.Box(track.rectTransform, "Fill", Palette.Accent, false).rectTransform;
         progressFill.anchorMin = Vector2.zero;
         progressFill.anchorMax = new Vector2(0f, 1f);
         progressFill.offsetMin = progressFill.offsetMax = Vector2.zero;
@@ -185,14 +211,11 @@ public class PlayView
 
     void BuildCenterTexts(UiFactory ui)
     {
-        judgementText = ui.Label(root, "Juicio", 92f, Color.white, TextAlignmentOptions.Center,
-                                 Layout.Centered(new Vector2(0f, 230f), new Vector2(1000f, 120f)));
-        UiFactory.Outline(judgementText, 0.25f);
-        noticeText = ui.Label(root, "Aviso", 48f, Palette.Accent, TextAlignmentOptions.Center,
-                              Layout.Centered(new Vector2(0f, 140f), new Vector2(1100f, 70f)));
-        UiFactory.Outline(noticeText, 0.25f);
-        countdownText = ui.Label(root, "Cuenta", 230f, Color.white, TextAlignmentOptions.Center,
-                                 Layout.Centered(new Vector2(0f, 80f), new Vector2(800f, 300f)));
-        UiFactory.Outline(countdownText, 0.3f);
+        judgementText = ui.Label(root, "Judgement", JudgementFontSize, Color.white, TextAlignmentOptions.Center, JudgementLayout);
+        UiFactory.Outline(judgementText, TextOutline);
+        noticeText = ui.Label(root, "Notice", NoticeFontSize, Palette.Accent, TextAlignmentOptions.Center, NoticeLayout);
+        UiFactory.Outline(noticeText, TextOutline);
+        countdownText = ui.Label(root, "Countdown", CountdownFontSize, Color.white, TextAlignmentOptions.Center, CountdownLayout);
+        UiFactory.Outline(countdownText, CountdownOutline);
     }
 }

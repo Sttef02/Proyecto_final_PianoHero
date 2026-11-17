@@ -15,6 +15,7 @@ public class ArduinoInput : MonoBehaviour
     [Header("Puerto serial")]
     [Tooltip("Vacio = detectar automaticamente. Ejemplo: COM3 (el mismo puerto del IDE de Arduino).")]
     public string portName = "";
+    [Min(1)]
     public int baudRate = 115200;
 
     [Header("Teclado de respaldo")]

@@ -13,12 +13,10 @@ public class Highway : MonoBehaviour
     const float NoteTailThickness = 0.04f;
     const float NoteTailWidthFactor = 0.22f;
     const float MinTailLength = 0.01f;
-    const float ButtonThickness = 0.03f;
-    const float ButtonIdleScale = 0.8f;
     const float ButtonFlashScale = 0.95f;
-    const float ButtonIdleBrightness = 0.35f;
     const float ButtonPressedBrightness = 0.9f;
     const float ButtonFlashBrightness = 1.4f;
+    const string TrackObjectName = "Track";
     static readonly Color MissedNoteColor = new Color(0.35f, 0.35f, 0.38f);
 
     [Header("Forma")]
@@ -58,7 +56,7 @@ public class Highway : MonoBehaviour
 
     void Awake()
     {
-        var root = new GameObject("Autopista").transform;
+        var root = new GameObject(TrackObjectName).transform;
         root.SetParent(transform, false);
         builder = new HighwayBuilder(root, laneWidth);
         builder.BuildTrack(length);
@@ -88,7 +86,7 @@ public class Highway : MonoBehaviour
             notes.Add(new HighwayNote { Data = data });
             LastNoteTime = Mathf.Max(LastNoteTime, data.time + data.duration);
         }
-        notes.Sort((a, b) => a.Data.time.CompareTo(b.Data.time));
+        notes.Sort((first, second) => first.Data.time.CompareTo(second.Data.time));
     }
 
     public void Clear()
@@ -212,12 +210,12 @@ public class Highway : MonoBehaviour
 
     void PlaceNote(HighwayNote note, float headZ, float endZ)
     {
-        float x = builder.LaneX(note.Lane);
-        if (note.Head != null) note.Head.localPosition = new Vector3(x, NoteHeadHeight, headZ);
+        float laneX = builder.LaneX(note.Lane);
+        if (note.Head != null) note.Head.localPosition = new Vector3(laneX, NoteHeadHeight, headZ);
         if (note.Tail == null) return;
 
         float tailLength = Mathf.Max(MinTailLength, endZ - headZ);
-        note.Tail.localPosition = new Vector3(x, NoteTailHeight, headZ + tailLength / 2f);
+        note.Tail.localPosition = new Vector3(laneX, NoteTailHeight, headZ + tailLength / 2f);
         note.Tail.localScale = new Vector3(laneWidth * NoteTailWidthFactor, NoteTailThickness, tailLength);
     }
 
@@ -244,12 +242,18 @@ public class Highway : MonoBehaviour
             bool flashing = flashTimers[lane] > 0f;
             bool isPressed = pressed != null && pressed[lane];
 
-            float brightness = flashing ? ButtonFlashBrightness : isPressed ? ButtonPressedBrightness : ButtonIdleBrightness;
+            float brightness = ButtonBrightness(flashing, isPressed);
             laneButtons[lane].material.color = laneColors[lane] * brightness;
 
-            float size = laneWidth * (flashing ? ButtonFlashScale : ButtonIdleScale);
-            laneButtons[lane].transform.localScale = new Vector3(size, ButtonThickness, size);
+            float size = laneWidth * (flashing ? ButtonFlashScale : HighwayBuilder.ButtonSizeFactor);
+            laneButtons[lane].transform.localScale = new Vector3(size, HighwayBuilder.ButtonThickness, size);
         }
+    }
+
+    static float ButtonBrightness(bool flashing, bool isPressed)
+    {
+        if (flashing) return ButtonFlashBrightness;
+        return isPressed ? ButtonPressedBrightness : HighwayBuilder.IdleButtonBrightness;
     }
 
     static void Tint(Renderer renderer, Color color)

@@ -29,6 +29,21 @@ const unsigned long STARTUP_PAUSE_MS = 200;
 const unsigned long SETTLE_MS = 20;
 const byte BLINK_COMMAND = 5;
 
+const char READY_MESSAGE[] = "READY";
+const char KNOB_PREFIX[] = "P:";
+const char BUTTON_PREFIX = 'B';
+const char BUTTON_SEPARATOR = ':';
+const char PRESSED_FLAG = '1';
+const char RELEASED_FLAG = '0';
+const char HEARTBEAT = 'H';
+const char LED_COMMAND = 'L';
+const char STATUS_REQUEST = '?';
+const char FIRST_DIGIT = '0';
+const byte COMMAND_VALUE_INDEX = 1;
+const byte MIN_LED_COMMAND_LENGTH = 2;
+const byte COMMAND_BUFFER_SIZE = 8;
+const int NEVER_SENT = -100;
+
 const byte FIRST_DIAGNOSTIC_PIN = 2;
 const byte LAST_DIAGNOSTIC_PIN = 13;
 const unsigned long DIAGNOSTIC_START_MS = 1500;
@@ -41,7 +56,7 @@ bool idleLevel[BUTTON_COUNT];
 unsigned long lastButtonChangeUs[BUTTON_COUNT];
 
 int smoothedKnob = 0;
-int lastSentKnob = -100;
+int lastSentKnob = NEVER_SENT;
 unsigned long lastKnobReadMs = 0;
 unsigned long lastHeartbeatMs = 0;
 
@@ -50,11 +65,11 @@ bool blinking = false;
 bool blinkOn = false;
 unsigned long lastBlinkMs = 0;
 
-char command[8];
+char command[COMMAND_BUFFER_SIZE];
 byte commandLength = 0;
 
 int lastPinLevel[LAST_DIAGNOSTIC_PIN + 1];
-int lastDiagnosticKnob = -100;
+int lastDiagnosticKnob = NEVER_SENT;
 
 // Presionado = el pin esta distinto a como estaba al encender, asi sirve con resistencia a tierra o a 5V.
 // Por eso no hay que presionar botones mientras arranca.
@@ -63,14 +78,14 @@ bool isButtonDown(byte button) {
 }
 
 void sendButton(byte button) {
-  Serial.print('B');
+  Serial.print(BUTTON_PREFIX);
   Serial.print(button + 1);
-  Serial.print(':');
-  Serial.println(pressed[button] ? '1' : '0');
+  Serial.print(BUTTON_SEPARATOR);
+  Serial.println(pressed[button] ? PRESSED_FLAG : RELEASED_FLAG);
 }
 
 void sendKnob() {
-  Serial.print(F("P:"));
+  Serial.print(KNOB_PREFIX);
   Serial.println(smoothedKnob);
   lastSentKnob = smoothedKnob;
 }
@@ -106,7 +121,7 @@ void setup() {
   setupPins();
   playStartupSweep();
   smoothedKnob = analogRead(KNOB_PIN);
-  Serial.println(F("READY"));
+  Serial.println(READY_MESSAGE);
   sendKnob();
 }
 
@@ -133,12 +148,12 @@ void readKnob(unsigned long nowMs) {
 void sendHeartbeat(unsigned long nowMs) {
   if (nowMs - lastHeartbeatMs < HEARTBEAT_INTERVAL_MS) return;
   lastHeartbeatMs = nowMs;
-  Serial.println('H');
+  Serial.println(HEARTBEAT);
 }
 
 void runCommand() {
-  if (command[0] == 'L' && commandLength >= 2) {
-    int value = command[1] - '0';
+  if (command[0] == LED_COMMAND && commandLength >= MIN_LED_COMMAND_LENGTH) {
+    int value = command[COMMAND_VALUE_INDEX] - FIRST_DIGIT;
     if (value >= 0 && value <= BUTTON_COUNT) {
       litLeds = value;
       blinking = false;
@@ -146,7 +161,7 @@ void runCommand() {
       litLeds = BUTTON_COUNT;
       blinking = true;
     }
-  } else if (command[0] == '?') {
+  } else if (command[0] == STATUS_REQUEST) {
     for (byte i = 0; i < BUTTON_COUNT; i++) sendButton(i);
     sendKnob();
   }
@@ -154,15 +169,15 @@ void runCommand() {
 
 void readCommands() {
   while (Serial.available()) {
-    char c = Serial.read();
-    if (c == '\n' || c == '\r') {
+    char received = Serial.read();
+    if (received == '\n' || received == '\r') {
       if (commandLength > 0) {
         command[commandLength] = 0;
         runCommand();
       }
       commandLength = 0;
     } else if (commandLength < sizeof(command) - 1) {
-      command[commandLength++] = c;
+      command[commandLength++] = received;
     }
   }
 }
@@ -195,7 +210,7 @@ void loop() {
 
 void setupDiagnostics() {
   delay(DIAGNOSTIC_START_MS);
-  Serial.println(F("=== DIAGNOSTICO 1/2: LEDs ==="));
+  Serial.println(F("DIAGNOSTICO 1/2: LEDs"));
   Serial.println(F("Mira que LED se enciende con cada pin y anotalo."));
   for (byte pin = FIRST_DIAGNOSTIC_PIN; pin <= LAST_DIAGNOSTIC_PIN; pin++) {
     // Solo se pone el pin en HIGH (nunca en LOW), asi es seguro aunque sea un boton.
@@ -212,7 +227,7 @@ void setupDiagnostics() {
     pinMode(pin, INPUT);
     lastPinLevel[pin] = digitalRead(pin);
   }
-  Serial.println(F("=== DIAGNOSTICO 2/2: BOTONES Y PERILLA ==="));
+  Serial.println(F("DIAGNOSTICO 2/2: BOTONES Y PERILLA"));
   Serial.println(F("Presiona cada boton y anota que pin cambia. Gira la perilla para probar A0."));
 }
 

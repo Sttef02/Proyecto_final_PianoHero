@@ -5,6 +5,7 @@ using System.IO.Ports;
 using System.Text;
 using System.Threading;
 
+// Busca el Arduino, se conecta y lee sus mensajes en un hilo aparte para no trabar el juego.
 public class SerialConnection
 {
     const int ReadTimeoutMs = 50;
@@ -13,24 +14,16 @@ public class SerialConnection
     const double StatusRequestDelaySeconds = 4.0;
     const int RetryDelayMs = 3000;
     const int RetryStepMs = 100;
-    const int IdleSleepMs = 1;
     const int CloseWaitMs = 500;
-    const int ReadBufferSize = 256;
-    const int MaxLineLength = 64;
-    const int MaxEchoLength = 80;
-    const int ExtendedPortNumber = 10;
-    const string ExtendedPortPrefix = @"\\.\";
-    const string ComPrefix = "COM";
-    const string RarelyArduinoPort = "COM1";
+    const string LineEnding = "\n";
+    const string ThreadName = "ArduinoSerial";
     const string LogPrefix = "[Arduino] ";
+    const string KeyboardHint = "(Teclado: D F J K)";
 
     readonly string preferredPort;
     readonly int baudRate;
     readonly ConcurrentQueue<SerialMessage> messages = new ConcurrentQueue<SerialMessage>();
-    readonly byte[] readBuffer = new byte[ReadBufferSize];
-    readonly StringBuilder partialLine = new StringBuilder();
-    readonly StringBuilder receivedEcho = new StringBuilder();
-    readonly List<string> completedLines = new List<string>();
+    readonly SerialLineReader reader = new SerialLineReader();
 
     volatile SerialPort port;
     volatile bool running;
@@ -49,7 +42,7 @@ public class SerialConnection
     {
         Close();
         running = true;
-        worker = new Thread(Run) { IsBackground = true, Name = "ArduinoSerial" };
+        worker = new Thread(Run) { IsBackground = true, Name = ThreadName };
         worker.Start();
     }
 
@@ -69,11 +62,12 @@ public class SerialConnection
         if (current == null) return false;
         try
         {
-            current.Write(text + "\n");
+            current.Write(text + LineEnding);
             return true;
         }
         catch (Exception)
         {
+            // Si el cable se desconecto, el hilo de lectura lo detecta y vuelve a buscar el Arduino.
             return false;
         }
     }
@@ -111,10 +105,10 @@ public class SerialConnection
         }
 
         string seen = available.Length == 0 ? "ninguno" : string.Join(", ", available);
-        List<string> candidates = OrderCandidates(available);
+        List<string> candidates = SerialPortList.Candidates(available, preferredPort);
         if (candidates.Count == 0)
         {
-            SetStatus($"No hay puertos COM. Revisa el cable USB. Puertos vistos: {seen}. (Teclado: D F J K)");
+            SetStatus($"No hay puertos COM. Revisa el cable USB. Puertos vistos: {seen}. {KeyboardHint}");
             return false;
         }
 
@@ -131,34 +125,8 @@ public class SerialConnection
             }
             errors.Append($"{name}: {error}  ");
         }
-        SetStatus($"No se encontro el Arduino. {errors}| Puertos vistos: {seen}. Reintentando... (Teclado: D F J K)");
+        SetStatus($"No se encontro el Arduino. {errors}| Puertos vistos: {seen}. Reintentando... {KeyboardHint}");
         return false;
-    }
-
-    List<string> OrderCandidates(string[] available)
-    {
-        var candidates = new List<string>();
-        if (!string.IsNullOrWhiteSpace(preferredPort))
-        {
-            candidates.Add(preferredPort.Trim().ToUpperInvariant());
-            return candidates;
-        }
-
-        // El Arduino suele ser el puerto con numero mas alto; COM1 casi nunca lo es.
-        var sorted = new List<string>(available);
-        sorted.Sort((a, b) => PortNumber(b).CompareTo(PortNumber(a)));
-        foreach (string name in sorted)
-            if (name != RarelyArduinoPort) candidates.Add(name);
-        if (sorted.Contains(RarelyArduinoPort)) candidates.Add(RarelyArduinoPort);
-        return candidates;
-    }
-
-    static int PortNumber(string name)
-    {
-        int number = 0;
-        foreach (char c in name)
-            if (char.IsDigit(c)) number = number * 10 + (c - '0');
-        return number;
     }
 
     string TryConnect(string name)
@@ -172,13 +140,11 @@ public class SerialConnection
         SerialPort candidate = null;
         try
         {
-            // Windows necesita este prefijo desde COM10 en adelante.
-            bool extended = name.StartsWith(ComPrefix) && PortNumber(name) >= ExtendedPortNumber;
-            candidate = new SerialPort(extended ? ExtendedPortPrefix + name : name, baudRate)
+            candidate = new SerialPort(SerialPortList.SystemName(name), baudRate)
             {
                 ReadTimeout = ReadTimeoutMs,
                 WriteTimeout = WriteTimeoutMs,
-                NewLine = "\n",
+                NewLine = LineEnding,
                 DtrEnable = true,
                 RtsEnable = true
             };
@@ -196,8 +162,7 @@ public class SerialConnection
         }
 
         port = candidate;
-        partialLine.Clear();
-        receivedEcho.Clear();
+        reader.Reset();
         return null;
     }
 
@@ -213,7 +178,7 @@ public class SerialConnection
 
             try
             {
-                foreach (string line in ReadLines())
+                foreach (string line in reader.ReadLines(port))
                 {
                     if (!SerialProtocol.IsKnownLine(line)) continue;
                     EnqueueLine(line, GameClock.Now);
@@ -228,17 +193,7 @@ public class SerialConnection
             }
         }
         ClosePort();
-        return DescribeSilence();
-    }
-
-    string DescribeSilence()
-    {
-        if (receivedEcho.Length == 0) return "no responde (no llego ningun dato; esta subido el sketch de PianoHero?)";
-
-        string echo = receivedEcho.ToString();
-        foreach (char c in echo)
-            if (c < '\t' || c > '~') return "llegan datos ilegibles: revisa que el sketch use Serial.begin(115200)";
-        return "no responde (llego: \"" + echo + "\")";
+        return reader.DescribeSilence();
     }
 
     bool ReadUntilDisconnected()
@@ -247,7 +202,7 @@ public class SerialConnection
         {
             try
             {
-                List<string> lines = ReadLines();
+                List<string> lines = reader.ReadLines(port);
                 double arrival = GameClock.Now;
                 foreach (string line in lines) EnqueueLine(line, arrival);
             }
@@ -256,43 +211,12 @@ public class SerialConnection
                 if (running)
                 {
                     messages.Enqueue(new SerialMessage { Type = SerialMessageType.ConnectionLost });
-                    SetStatus("Se perdio la conexion con el Arduino. Reintentando... (Teclado: D F J K)");
+                    SetStatus($"Se perdio la conexion con el Arduino. Reintentando... {KeyboardHint}");
                 }
                 return false;
             }
         }
         return true;
-    }
-
-    // BytesToRead es la forma mas confiable de leer sin bloquear en Windows.
-    List<string> ReadLines()
-    {
-        completedLines.Clear();
-        int available = port.BytesToRead;
-        if (available <= 0)
-        {
-            Thread.Sleep(IdleSleepMs);
-            return completedLines;
-        }
-
-        int count = port.Read(readBuffer, 0, Math.Min(available, readBuffer.Length));
-        for (int i = 0; i < count; i++) AppendChar((char)readBuffer[i]);
-        return completedLines;
-    }
-
-    void AppendChar(char c)
-    {
-        bool endOfLine = c == '\n' || c == '\r';
-        if (receivedEcho.Length < MaxEchoLength) receivedEcho.Append(endOfLine ? ' ' : c);
-
-        if (!endOfLine)
-        {
-            if (partialLine.Length < MaxLineLength) partialLine.Append(c);
-            return;
-        }
-        if (partialLine.Length == 0) return;
-        completedLines.Add(partialLine.ToString().Trim());
-        partialLine.Clear();
     }
 
     void EnqueueLine(string line, double time)
@@ -309,7 +233,7 @@ public class SerialConnection
         {
             if (current.IsOpen)
             {
-                current.Write(SerialProtocol.LedCommand(0) + "\n");
+                current.Write(SerialProtocol.LedCommand(0) + LineEnding);
                 current.Close();
             }
             current.Dispose();

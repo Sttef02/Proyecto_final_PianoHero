@@ -13,6 +13,9 @@ public class UiFactory
     const float SpritePixelsPerUnit = 100f;
     const float SlicedPixelsPerUnitMultiplier = 1.6f;
     const float BorderThickness = 3f;
+    const float PixelCenter = 0.5f;
+    const byte Opaque = 255;
+    static readonly Color32 OutlineColor = new Color32(0, 0, 0, Opaque);
 
     readonly TMP_FontAsset font;
     readonly Sprite roundedSprite;
@@ -50,8 +53,8 @@ public class UiFactory
     {
         RectTransform panel = CreateRect(name, parent);
         layout.ApplyTo(panel);
-        Stretch(Box(panel, "Borde", border).rectTransform, -BorderThickness);
-        Stretch(Box(panel, "Fondo", background).rectTransform, 0f);
+        Stretch(Box(panel, "Border", border).rectTransform, -BorderThickness);
+        Stretch(Box(panel, "Background", background).rectTransform, 0f);
         return panel;
     }
 
@@ -95,7 +98,7 @@ public class UiFactory
     public static void Outline(TMP_Text label, float width)
     {
         label.outlineWidth = width;
-        label.outlineColor = new Color32(0, 0, 0, 255);
+        label.outlineColor = OutlineColor;
     }
 
     public static void Stretch(RectTransform rect, float inset)
@@ -126,9 +129,9 @@ public class UiFactory
         var texture = new Texture2D(CornerTextureSize, CornerTextureSize, TextureFormat.RGBA32, false);
         texture.wrapMode = TextureWrapMode.Clamp;
         var pixels = new Color32[CornerTextureSize * CornerTextureSize];
-        for (int y = 0; y < CornerTextureSize; y++)
-            for (int x = 0; x < CornerTextureSize; x++)
-                pixels[y * CornerTextureSize + x] = new Color32(255, 255, 255, CornerAlpha(x, y));
+        for (int pixelY = 0; pixelY < CornerTextureSize; pixelY++)
+            for (int pixelX = 0; pixelX < CornerTextureSize; pixelX++)
+                pixels[pixelY * CornerTextureSize + pixelX] = new Color32(Opaque, Opaque, Opaque, CornerAlpha(pixelX, pixelY));
         texture.SetPixels32(pixels);
         texture.Apply();
 
@@ -137,12 +140,12 @@ public class UiFactory
                              SpritePixelsPerUnit, 0, SpriteMeshType.FullRect, border);
     }
 
-    static byte CornerAlpha(int x, int y)
+    static byte CornerAlpha(int pixelX, int pixelY)
     {
-        var pixel = new Vector2(x + 0.5f, y + 0.5f);
+        var pixel = new Vector2(pixelX + PixelCenter, pixelY + PixelCenter);
         var nearestInside = new Vector2(Mathf.Clamp(pixel.x, CornerRadius, CornerTextureSize - CornerRadius),
                                         Mathf.Clamp(pixel.y, CornerRadius, CornerTextureSize - CornerRadius));
-        float coverage = Mathf.Clamp01(CornerRadius - Vector2.Distance(pixel, nearestInside) + 0.5f);
-        return (byte)(coverage * 255);
+        float coverage = Mathf.Clamp01(CornerRadius - Vector2.Distance(pixel, nearestInside) + PixelCenter);
+        return (byte)(coverage * Opaque);
     }
 }

@@ -13,6 +13,7 @@ public class ChartNote
 public class ChartData
 {
     public const float DefaultBpm = 120f;
+    public const double SecondsPerMinute = 60.0;
 
     public string title;
     public string artist;
@@ -20,5 +21,5 @@ public class ChartData
     public float offset;
     public List<ChartNote> notes = new List<ChartNote>();
 
-    public void SortNotes() => notes.Sort((a, b) => a.time.CompareTo(b.time));
+    public void SortNotes() => notes.Sort((first, second) => first.time.CompareTo(second.time));
 }

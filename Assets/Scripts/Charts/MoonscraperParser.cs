@@ -9,7 +9,6 @@ public static class MoonscraperParser
 {
     const int DefaultResolution = 192;
     const double TempoScale = 1000.0;
-    const double SecondsPerMinute = 60.0;
     const float MinSustainSeconds = 0.15f;
     const int MaxPlayableFret = 4;
     const string SongSection = "Song";
@@ -18,6 +17,17 @@ public static class MoonscraperParser
     const string ResolutionKey = "Resolution";
     const string NameKey = "Name";
     const string ArtistKey = "Artist";
+    const string SectionStart = "[";
+    const string SectionEnd = "]";
+    const string BlockStart = "{";
+    const string BlockEnd = "}";
+    const char KeyValueSeparator = '=';
+    const char LineSeparator = '\n';
+    const char Quote = '"';
+    const int KeyValueParts = 2;
+    const int TickGroup = 1;
+    const int ValueGroup = 2;
+    const int SustainGroup = 3;
     static readonly string[] DifficultyFallbacks = { "Expert", "Hard", "Medium", "Easy" };
     static readonly Regex TempoLine = new Regex(@"^\s*(\d+)\s*=\s*B\s+(\d+)");
     static readonly Regex NoteLine = new Regex(@"^\s*(\d+)\s*=\s*N\s+(\d+)\s+(\d+)");
@@ -50,15 +60,15 @@ public static class MoonscraperParser
     {
         var sections = new Dictionary<string, List<string>>();
         List<string> current = null;
-        foreach (string rawLine in text.Split('\n'))
+        foreach (string rawLine in text.Split(LineSeparator))
         {
             string line = rawLine.Trim();
-            if (line.StartsWith("[") && line.EndsWith("]"))
+            if (line.StartsWith(SectionStart) && line.EndsWith(SectionEnd))
             {
                 current = new List<string>();
-                sections[line.Substring(1, line.Length - 2)] = current;
+                sections[line.Substring(SectionStart.Length, line.Length - SectionStart.Length - SectionEnd.Length)] = current;
             }
-            else if (current != null && line.Length > 0 && line != "{" && line != "}")
+            else if (current != null && line.Length > 0 && line != BlockStart && line != BlockEnd)
             {
                 current.Add(line);
             }
@@ -73,10 +83,10 @@ public static class MoonscraperParser
 
         foreach (string line in lines)
         {
-            string[] pair = line.Split(new[] { '=' }, 2);
-            if (pair.Length < 2) continue;
+            string[] pair = line.Split(new[] { KeyValueSeparator }, KeyValueParts);
+            if (pair.Length < KeyValueParts) continue;
             string key = pair[0].Trim();
-            string value = pair[1].Trim().Trim('"');
+            string value = pair[1].Trim().Trim(Quote);
             if (key == ResolutionKey && int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) && parsed > 0)
                 resolution = parsed;
             else if (key == NameKey) chart.title = value;
@@ -96,12 +106,12 @@ public static class MoonscraperParser
                 if (!match.Success) continue;
                 tempo.Add(new TempoChange
                 {
-                    Tick = ParseLong(match.Groups[1].Value),
-                    Bpm = ParseLong(match.Groups[2].Value) / TempoScale
+                    Tick = ParseLong(match.Groups[TickGroup].Value),
+                    Bpm = ParseLong(match.Groups[ValueGroup].Value) / TempoScale
                 });
             }
         }
-        tempo.Sort((a, b) => a.Tick.CompareTo(b.Tick));
+        tempo.Sort((first, second) => first.Tick.CompareTo(second.Tick));
         if (tempo.Count == 0 || tempo[0].Tick != 0) tempo.Insert(0, new TempoChange { Tick = 0, Bpm = ChartData.DefaultBpm });
         return tempo;
     }
@@ -123,9 +133,9 @@ public static class MoonscraperParser
             Match match = NoteLine.Match(line);
             if (!match.Success) continue;
 
-            long tick = ParseLong(match.Groups[1].Value);
-            int fret = (int)ParseLong(match.Groups[2].Value);
-            long sustainTicks = ParseLong(match.Groups[3].Value);
+            long tick = ParseLong(match.Groups[TickGroup].Value);
+            int fret = (int)ParseLong(match.Groups[ValueGroup].Value);
+            long sustainTicks = ParseLong(match.Groups[SustainGroup].Value);
             // 5 = forzada, 6 = tap, 7 = abierta: no son notas jugables.
             if (fret > MaxPlayableFret) continue;
 
@@ -144,7 +154,7 @@ public static class MoonscraperParser
         for (int i = 0; i < tempo.Count && tick > tempo[i].Tick; i++)
         {
             long segmentEnd = i + 1 < tempo.Count ? Math.Min(tick, tempo[i + 1].Tick) : tick;
-            seconds += (segmentEnd - tempo[i].Tick) / (double)resolution * SecondsPerMinute / tempo[i].Bpm;
+            seconds += (segmentEnd - tempo[i].Tick) / (double)resolution * ChartData.SecondsPerMinute / tempo[i].Bpm;
         }
         return seconds;
     }

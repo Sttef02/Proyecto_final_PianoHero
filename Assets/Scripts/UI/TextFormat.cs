@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using System.Text;
 
@@ -5,6 +6,7 @@ public static class TextFormat
 {
     const char InvertedExclamation = '\u00A1';
     const char InvertedQuestion = '\u00BF';
+    const string ThousandsFormat = "N0";
 
     // La fuente pixel (BoldPixels) no trae tildes ni signos de apertura.
     public static string ForPixelFont(string text)
@@ -12,11 +14,11 @@ public static class TextFormat
         if (string.IsNullOrEmpty(text)) return "";
 
         var builder = new StringBuilder(text.Length);
-        foreach (char c in text.Normalize(NormalizationForm.FormD))
+        foreach (char character in text.Normalize(NormalizationForm.FormD))
         {
-            if (CharUnicodeInfo.GetUnicodeCategory(c) == UnicodeCategory.NonSpacingMark) continue;
-            if (c == InvertedExclamation || c == InvertedQuestion) continue;
-            builder.Append(c);
+            if (CharUnicodeInfo.GetUnicodeCategory(character) == UnicodeCategory.NonSpacingMark) continue;
+            if (character == InvertedExclamation || character == InvertedQuestion) continue;
+            builder.Append(character);
         }
         return builder.ToString().Normalize(NormalizationForm.FormC).ToUpperInvariant();
     }
@@ -41,5 +43,5 @@ public static class TextFormat
         }
     }
 
-    public static string Points(float points) => ((int)System.Math.Round(points)).ToString("N0");
+    public static string Points(float points) => ((int)Math.Round(points)).ToString(ThousandsFormat);
 }

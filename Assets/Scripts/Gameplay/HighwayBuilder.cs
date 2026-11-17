@@ -21,12 +21,12 @@ public class HighwayBuilder
     const float LaneLineThickness = 0.02f;
     const float HitLineDepth = 0.08f;
     const float HitLineHeight = -0.01f;
+    public const float ButtonThickness = 0.03f;
+    public const float ButtonSizeFactor = 0.8f;
+    public const float IdleButtonBrightness = 0.35f;
     const float ButtonHeight = 0.02f;
-    const float ButtonThickness = 0.03f;
-    const float ButtonSizeFactor = 0.8f;
     const float NoteHeadSizeFactor = 0.75f;
     const float NoteHeadThickness = 0.08f;
-    const float IdleButtonBrightness = 0.35f;
     const float TailBrightness = 0.8f;
 
     static readonly Color TrackColor = new Color(0.06f, 0.06f, 0.09f);
@@ -46,12 +46,14 @@ public class HighwayBuilder
         this.laneWidth = laneWidth;
         // En el build Unity quita los shaders que ningun material usa; el material de Resources siempre se incluye.
         baseMaterial = Resources.Load<Material>(MaterialResourceName);
-        if (baseMaterial == null) fallbackShader = FindFallbackShader();
+        if (baseMaterial != null) return;
+        fallbackShader = FindFallbackShader();
+        if (fallbackShader == null) Debug.LogError("No se encontro el material " + MaterialResourceName + " ni un shader de respaldo.");
     }
 
     public float LaneX(int lane) => (lane - (ArduinoInput.LaneCount - 1) / 2f) * laneWidth;
 
-    public Material CreateMaterial(Color color)
+    Material CreateMaterial(Color color)
     {
         var material = baseMaterial != null ? new Material(baseMaterial) : new Material(fallbackShader);
         material.color = color;
@@ -70,8 +72,8 @@ public class HighwayBuilder
         Material lineMaterial = CreateMaterial(LaneLineColor);
         for (int line = 0; line <= ArduinoInput.LaneCount; line++)
         {
-            float x = (line - ArduinoInput.LaneCount / 2f) * laneWidth;
-            CreatePrimitive(PrimitiveType.Cube, new Vector3(x, LaneLineHeight, centerZ),
+            float lineX = (line - ArduinoInput.LaneCount / 2f) * laneWidth;
+            CreatePrimitive(PrimitiveType.Cube, new Vector3(lineX, LaneLineHeight, centerZ),
                             new Vector3(LaneLineWidth, LaneLineThickness, fullLength), lineMaterial);
         }
 

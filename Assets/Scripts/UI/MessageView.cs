@@ -4,6 +4,16 @@ using UnityEngine;
 public class MessageView
 {
     const string RecordingHelp = "B1 + B4 (2 S) O ESC PARA TERMINAR Y GUARDAR";
+    const string CountdownFormat = "GRABANDO CHART EN {0}...";
+    const string RecordingFormat = "GRABANDO CHART  -  {0} NOTAS   |   {1}";
+    const float MessageFontSize = 28f;
+    const float RecordingFontSize = 34f;
+    const float MessagePaddingX = 24f;
+    const float MessagePaddingY = 8f;
+    const float RecordingPaddingX = 20f;
+    const float RecordingBannerHeight = 120f;
+
+    static readonly Layout MessageLayout = Layout.At(Layout.BottomCenter, new Vector2(0f, 170f), new Vector2(1240f, 110f));
 
     readonly RectTransform messagePanel;
     readonly TextMeshProUGUI messageText;
@@ -13,18 +23,16 @@ public class MessageView
 
     public MessageView(UiFactory ui, Transform canvas)
     {
-        messagePanel = ui.Panel(canvas, "Mensaje", Layout.At(Layout.BottomCenter, new Vector2(0f, 170f), new Vector2(1240f, 110f)),
-                                Palette.MessageBackground, Palette.Accent);
-        messageText = ui.Label(messagePanel, "Texto", 28f, Color.white, TextAlignmentOptions.Center);
+        messagePanel = ui.Panel(canvas, "Message", MessageLayout, Palette.MessageBackground, Palette.Accent);
+        messageText = ui.Label(messagePanel, "Text", MessageFontSize, Color.white, TextAlignmentOptions.Center);
         messageText.textWrappingMode = TextWrappingModes.Normal;
-        UiFactory.Stretch(messageText.rectTransform, 24f, 8f);
+        UiFactory.Stretch(messageText.rectTransform, MessagePaddingX, MessagePaddingY);
         messagePanel.gameObject.SetActive(false);
 
-        var banner = ui.Box(canvas, "Grabando", Palette.RecordingBanner, false);
-        recordingBanner = banner.rectTransform;
-        Layout.TopRow(Layout.TopCenter, Vector2.zero, 0f, 120f).ApplyTo(recordingBanner);
-        recordingText = ui.Label(recordingBanner, "Texto", 34f, Color.white, TextAlignmentOptions.Center);
-        UiFactory.Stretch(recordingText.rectTransform, 20f, 0f);
+        recordingBanner = ui.Box(canvas, "RecordingBanner", Palette.RecordingBanner, false).rectTransform;
+        Layout.TopRow(Layout.TopCenter, Vector2.zero, 0f, RecordingBannerHeight).ApplyTo(recordingBanner);
+        recordingText = ui.Label(recordingBanner, "Text", RecordingFontSize, Color.white, TextAlignmentOptions.Center);
+        UiFactory.Stretch(recordingText.rectTransform, RecordingPaddingX, 0f);
         recordingBanner.gameObject.SetActive(false);
     }
 
@@ -39,8 +47,8 @@ public class MessageView
     {
         recordingBanner.gameObject.SetActive(true);
         recordingText.text = songTime < 0.0
-            ? $"GRABANDO CHART EN {Mathf.CeilToInt((float)-songTime)}..."
-            : $"GRABANDO CHART  -  {noteCount} NOTAS   |   {RecordingHelp}";
+            ? string.Format(CountdownFormat, Mathf.CeilToInt((float)-songTime))
+            : string.Format(RecordingFormat, noteCount, RecordingHelp);
     }
 
     public void HideRecording() => recordingBanner.gameObject.SetActive(false);

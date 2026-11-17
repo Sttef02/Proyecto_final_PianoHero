@@ -11,7 +11,10 @@ public static class SerialProtocol
     const char ButtonSeparator = ':';
     const char PressedFlag = '1';
     const int ButtonLineLength = 4;
-    const int ButtonCount = 4;
+    const int ButtonNumberIndex = 1;
+    const int ButtonSeparatorIndex = 2;
+    const int ButtonStateIndex = 3;
+    const char FirstButtonNumber = '1';
 
     public static bool TryParse(string line, double time, out SerialMessage message)
     {
@@ -37,14 +40,14 @@ public static class SerialProtocol
 
     static bool TryParseButton(string line, ref SerialMessage message)
     {
-        if (line.Length < ButtonLineLength || line[0] != ButtonPrefix || line[2] != ButtonSeparator) return false;
+        if (line.Length < ButtonLineLength || line[0] != ButtonPrefix || line[ButtonSeparatorIndex] != ButtonSeparator) return false;
 
-        int button = line[1] - '1';
-        if (button < 0 || button >= ButtonCount) return false;
+        int button = line[ButtonNumberIndex] - FirstButtonNumber;
+        if (button < 0 || button >= ArduinoInput.LaneCount) return false;
 
         message.Type = SerialMessageType.Button;
         message.Index = button;
-        message.Value = line[3] == PressedFlag ? 1 : 0;
+        message.Value = line[ButtonStateIndex] == PressedFlag ? 1 : 0;
         return true;
     }
 }
