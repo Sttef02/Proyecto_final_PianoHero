@@ -9,17 +9,18 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 341988ce33fb4d47876e3efe7b542f53, type: 3}
+  m_Script: {fileID: 11500000, guid: 4ac23c16249447e5bf8fa8f9d3a737ea, type: 3}
   m_Name: TheLessIKnowTheBetter_Media
   m_EditorClassIdentifier: 
-  titulo: The Less I Know The Better
-  artista: Tame Impala
+  title: The Less I Know The Better
+  artist: Tame Impala
+  difficulty: 1
   audio: {fileID: 8300000, guid: 19c5ea0ce2a04ca4bca9e6cd32877b46, type: 3}
   chart: {fileID: 4900000, guid: 97a28190471d4d3fa026f1e7efef05bb, type: 3}
-  dificultad: Expert
+  chartDifficulty: Expert
   bpm: 116.989
-  primerTiempo: 0.0193
+  firstBeatTime: 0.0193
   subdivision: 4
-  offsetExtra: 0
-  velocidad: 1
-  inicioPreview: 30.0
+  extraOffset: 0
+  speedMultiplier: 1
+  previewStart: 30.0

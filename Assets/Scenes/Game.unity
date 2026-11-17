@@ -2249,39 +2249,43 @@ MonoBehaviour:
   m_GameObject: {fileID: 2099352023}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 30c1e07f0253466580acf32cadc45373, type: 3}
+  m_Script: {fileID: 11500000, guid: 74362f53b7944b4d82f479c8aa982507, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameFlow
-  canciones:
+  songs:
   - {fileID: 11400000, guid: 2f0e9e113b41418a81a9b3ea2ed0cbfd, type: 2}
   - {fileID: 11400000, guid: a9df7eef0c5c4c60b945ee031fae9fbe, type: 2}
   - {fileID: 11400000, guid: 6e4ee856053a4ed7aeebf3de2d604559, type: 2}
-  penalizarGolpesAlAire: 0
-  notasPorLed: 10
-  rachaParpadeo: 50
-  esperaInicial: 2.5
-  grabarEncima: 0
-  entrada: {fileID: 0}
+  penalizeEmptyHits: 0
+  startDelay: 2.5
+  score:
+    notesPerLed: 10
+    starStreak: 50
+  recordOverExisting: 0
+  controller: {fileID: 0}
   conductor: {fileID: 0}
-  pista: {fileID: 0}
-  panelMenu: {fileID: 1884433382}
-  textoLatencia: {fileID: 1905672649}
-  textoConexion: {fileID: 2060437870}
-  textoPerilla: {fileID: 1348164545}
-  textosCanciones:
-  - {fileID: 0}
-  - {fileID: 1440672475}
-  - {fileID: 1041761133}
-  - {fileID: 2085228478}
-  botonesPrueba:
-  - {fileID: 1372637011}
-  - {fileID: 4724746}
-  - {fileID: 622057523}
-  - {fileID: 1866678697}
-  colorActiva: {r: 1, g: 0.6, b: 0.1, a: 1}
-  colorNormal: {r: 1, g: 1, b: 1, a: 1}
-  seleccionarAlPasar: 1
-  clicParaJugar: 1
+  highway: {fileID: 0}
+  hud: {fileID: 0}
+  hudFont: {fileID: 0}
+  menu:
+    menuPanel: {fileID: 1884433382}
+    latencyText: {fileID: 1905672649}
+    connectionText: {fileID: 2060437870}
+    knobText: {fileID: 1348164545}
+    songTexts:
+    - {fileID: 0}
+    - {fileID: 1440672475}
+    - {fileID: 1041761133}
+    - {fileID: 2085228478}
+    keyIcons:
+    - {fileID: 1372637011}
+    - {fileID: 4724746}
+    - {fileID: 622057523}
+    - {fileID: 1866678697}
+    selectedColor: {r: 1, g: 0.6, b: 0.1, a: 1}
+    normalColor: {r: 1, g: 1, b: 1, a: 1}
+    selectOnHover: 1
+    clickToPlay: 1
 --- !u!4 &2099352025
 Transform:
   m_ObjectHideFlags: 0

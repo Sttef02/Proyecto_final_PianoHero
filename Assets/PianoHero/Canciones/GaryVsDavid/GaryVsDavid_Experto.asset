@@ -9,17 +9,18 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 341988ce33fb4d47876e3efe7b542f53, type: 3}
+  m_Script: {fileID: 11500000, guid: 4ac23c16249447e5bf8fa8f9d3a737ea, type: 3}
   m_Name: GaryVsDavid_Experto
   m_EditorClassIdentifier: 
-  titulo: The Synth Wars (Gary vs David) (Experto)
-  artista: Jack O'Reilly
+  title: The Synth Wars (Gary vs David) (Experto)
+  artist: Jack O'Reilly
+  difficulty: 2
   audio: {fileID: 8300000, guid: 8cd85cc1802a4c6194c0a18bf495cca7, type: 3}
   chart: {fileID: 4900000, guid: c795e03beb0640fd9a0b8c34ac0ce103, type: 3}
-  dificultad: Expert
+  chartDifficulty: Expert
   bpm: 114.981
-  primerTiempo: 0.3451
+  firstBeatTime: 0.3451
   subdivision: 4
-  offsetExtra: 0
-  velocidad: 1
-  inicioPreview: 185.6
+  extraOffset: 0
+  speedMultiplier: 1
+  previewStart: 185.6

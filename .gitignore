@@ -113,3 +113,19 @@ InitTestScene*.unity*
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
 README.md
+
+# Carpetas de proyecto copiadas por error dentro de Assets
+/[Aa]ssets/[Aa]ssets/
+/[Aa]ssets/[Aa]ssets.meta
+/[Aa]ssets/[Ll]ibrary/
+/[Aa]ssets/[Ll]ibrary.meta
+/[Aa]ssets/[Ll]ogs/
+/[Aa]ssets/[Ll]ogs.meta
+/[Aa]ssets/[Pp]ackages/
+/[Aa]ssets/[Pp]ackages.meta
+/[Aa]ssets/[Pp]roject[Ss]ettings/
+/[Aa]ssets/[Pp]roject[Ss]ettings.meta
+/[Aa]ssets/[Uu]ser[Ss]ettings/
+/[Aa]ssets/[Uu]ser[Ss]ettings.meta
+/[Aa]ssets/[Tt]emp/
+/[Aa]ssets/[Tt]emp.meta

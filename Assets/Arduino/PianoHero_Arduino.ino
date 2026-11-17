@@ -1,207 +1,235 @@
-// =====================================================================
-//  PianoHero - Control con Arduino Uno
-//  4 botones (carriles), 1 potenciometro (seleccion de cancion),
-//  4 LEDs (racha).
+// PianoHero - control con Arduino Uno
+// Entradas: 4 botones (carriles) y 1 potenciometro (seleccion de cancion).
+// Salidas: 4 LEDs que muestran la racha.
 //
-//  Protocolo serial (115200 baudios, un mensaje por linea):
-//    Arduino -> PC:
-//      "READY"        al arrancar
-//      "B1:1"/"B1:0"  boton 1 presionado / soltado  (B1..B4)
-//      "P:734"        valor del potenciometro (0-1023), solo cuando cambia
-//      "H"            latido cada 1 s (para que Unity sepa que esta conectado)
-//    PC -> Arduino:
-//      "L0".."L4"     cuantos LEDs encender (de izquierda a derecha)
-//      "L5"           los 4 LEDs parpadeando (racha maxima)
-//      "?"            reenviar estado de botones y potenciometro
-// =====================================================================
+// Protocolo serial (115200 baudios, un mensaje por linea):
+//   Arduino -> PC: "READY" al arrancar, "B1:1"/"B1:0" boton presionado/soltado (B1..B4),
+//                  "P:734" potenciometro 0-1023 (solo cuando cambia), "H" latido cada segundo.
+//   PC -> Arduino: "L0".."L4" LEDs encendidos, "L5" los cuatro parpadeando, "?" reenviar estado.
 
-// ================== CONFIGURA AQUI TUS PINES ==================
-// Orden: carril 1 (verde), 2 (rojo), 3 (amarillo), 4 (azul)
-const byte PINES_BOTON[4] = {6, 7, 8, 9};
-// Orden: LED 1 (se enciende primero) ... LED 4 (ultimo)
-const byte PINES_LED[4]   = {2, 3, 4, 5};
-const byte PIN_POT = A0;
+const byte BUTTON_COUNT = 4;
+const byte BUTTON_PINS[BUTTON_COUNT] = {6, 7, 8, 9};   // verde, rojo, amarillo, azul
+const byte LED_PINS[BUTTON_COUNT] = {2, 3, 4, 5};      // se encienden en este orden
+const byte KNOB_PIN = A0;
 
-// Tus botones tienen resistencia externa (pull-down): leen HIGH al presionar.
-// Si algun dia conectas los botones directo a GND sin resistencia, pon true.
-const bool USAR_PULLUP_INTERNO = false;
+// Con resistencia externa a tierra los botones leen HIGH al presionar. Si se conectan directo a GND, poner true.
+const bool USE_INTERNAL_PULLUP = false;
+// true = muestra en el Monitor Serie que pin cambia al presionar cada boton (para revisar el cableado).
+const bool DIAGNOSTIC_MODE = false;
 
-// Pon true, sube el sketch y abre el Monitor Serie (115200) para ver
-// que pin cambia al presionar cada boton. Luego vuelve a false.
-const bool MODO_DIAGNOSTICO = false;
-// ===============================================================
+const long BAUD_RATE = 115200;
+const unsigned long DEBOUNCE_US = 8000;
+const unsigned long KNOB_INTERVAL_MS = 15;
+const int KNOB_MIN_CHANGE = 6;
+const int KNOB_SMOOTHING = 4;
+const unsigned long BLINK_INTERVAL_MS = 120;
+const unsigned long HEARTBEAT_INTERVAL_MS = 1000;
+const unsigned long STARTUP_SWEEP_MS = 150;
+const unsigned long STARTUP_PAUSE_MS = 200;
+const unsigned long SETTLE_MS = 20;
+const byte BLINK_COMMAND = 5;
 
-const unsigned long DEBOUNCE_US = 8000;   // 8 ms: rapido para juego de ritmo
-const int UMBRAL_POT = 6;                  // cambio minimo para reenviar
-const unsigned long INTERVALO_POT_MS = 15;
-const unsigned long INTERVALO_PARPADEO_MS = 120;
+const byte FIRST_DIAGNOSTIC_PIN = 2;
+const byte LAST_DIAGNOSTIC_PIN = 13;
+const unsigned long DIAGNOSTIC_START_MS = 1500;
+const unsigned long DIAGNOSTIC_LED_MS = 900;
+const unsigned long DIAGNOSTIC_LOOP_MS = 5;
+const int DIAGNOSTIC_KNOB_CHANGE = 30;
 
-bool estado[4];
-bool reposo[4];   // lectura del pin con el boton suelto (se mide al encender)
-unsigned long ultimoCambio[4];
+bool pressed[BUTTON_COUNT];
+bool idleLevel[BUTTON_COUNT];
+unsigned long lastButtonChangeUs[BUTTON_COUNT];
 
-int potSuavizado = 0;
-int ultimoPotEnviado = -100;
-unsigned long ultimoPotMs = 0;
-unsigned long ultimoLatidoMs = 0;
+int smoothedKnob = 0;
+int lastSentKnob = -100;
+unsigned long lastKnobReadMs = 0;
+unsigned long lastHeartbeatMs = 0;
 
-byte ledsPedidos = 0;
-bool parpadeo = false;
-bool faseParpadeo = false;
-unsigned long ultimoParpadeoMs = 0;
+byte litLeds = 0;
+bool blinking = false;
+bool blinkOn = false;
+unsigned long lastBlinkMs = 0;
 
-char buffer[8];
-byte bufLen = 0;
+char command[8];
+byte commandLength = 0;
 
-// Diagnostico
-int prevPin[14];
-int prevPotDiag = -100;
+int lastPinLevel[LAST_DIAGNOSTIC_PIN + 1];
+int lastDiagnosticKnob = -100;
 
-// Presionado = el pin esta distinto a como estaba en reposo.
-// Asi funciona igual con resistencia a tierra o a 5V. NO presiones botones al encender.
-bool leerBoton(byte i) {
-  return digitalRead(PINES_BOTON[i]) != reposo[i];
+// Presionado = el pin esta distinto a como estaba al encender, asi sirve con resistencia a tierra o a 5V.
+// Por eso no hay que presionar botones mientras arranca.
+bool isButtonDown(byte button) {
+  return digitalRead(BUTTON_PINS[button]) != idleLevel[button];
 }
 
-void enviarBoton(byte i) {
+void sendButton(byte button) {
   Serial.print('B');
-  Serial.print(i + 1);
+  Serial.print(button + 1);
   Serial.print(':');
-  Serial.println(estado[i] ? '1' : '0');
+  Serial.println(pressed[button] ? '1' : '0');
 }
 
-void enviarPot() {
+void sendKnob() {
   Serial.print(F("P:"));
-  Serial.println(potSuavizado);
-  ultimoPotEnviado = potSuavizado;
+  Serial.println(smoothedKnob);
+  lastSentKnob = smoothedKnob;
+}
+
+void setupPins() {
+  for (byte i = 0; i < BUTTON_COUNT; i++) {
+    pinMode(BUTTON_PINS[i], USE_INTERNAL_PULLUP ? INPUT_PULLUP : INPUT);
+    pinMode(LED_PINS[i], OUTPUT);
+  }
+  delay(SETTLE_MS);
+  for (byte i = 0; i < BUTTON_COUNT; i++) {
+    idleLevel[i] = digitalRead(BUTTON_PINS[i]);
+    pressed[i] = false;
+    lastButtonChangeUs[i] = 0;
+  }
+}
+
+void playStartupSweep() {
+  for (byte i = 0; i < BUTTON_COUNT; i++) {
+    digitalWrite(LED_PINS[i], HIGH);
+    delay(STARTUP_SWEEP_MS);
+  }
+  delay(STARTUP_PAUSE_MS);
+  for (byte i = 0; i < BUTTON_COUNT; i++) digitalWrite(LED_PINS[i], LOW);
 }
 
 void setup() {
-  Serial.begin(115200);
-
-  if (MODO_DIAGNOSTICO) {
-    delay(1500);
-    Serial.println(F("=== DIAGNOSTICO 1/2: LEDs ==="));
-    Serial.println(F("Mira que LED se enciende con cada pin y anotalo."));
-    for (byte p = 2; p <= 13; p++) {
-      // Solo se pone el pin en HIGH (nunca en LOW), asi es seguro aunque sea un boton.
-      digitalWrite(p, HIGH);
-      pinMode(p, OUTPUT);
-      Serial.print(F("Pin "));
-      Serial.print(p);
-      Serial.println(F(" encendido"));
-      delay(900);
-      pinMode(p, INPUT);
-      digitalWrite(p, LOW);
-    }
-    for (byte p = 2; p <= 13; p++) { pinMode(p, INPUT); prevPin[p] = digitalRead(p); }
-    Serial.println(F("=== DIAGNOSTICO 2/2: BOTONES Y PERILLA ==="));
-    Serial.println(F("Presiona cada boton y anota que pin cambia. Gira la perilla para probar A0."));
+  Serial.begin(BAUD_RATE);
+  if (DIAGNOSTIC_MODE) {
+    setupDiagnostics();
     return;
   }
-
-  for (byte i = 0; i < 4; i++) {
-    pinMode(PINES_BOTON[i], USAR_PULLUP_INTERNO ? INPUT_PULLUP : INPUT);
-    pinMode(PINES_LED[i], OUTPUT);
-  }
-  delay(20);
-  for (byte i = 0; i < 4; i++) {
-    reposo[i] = digitalRead(PINES_BOTON[i]);
-    estado[i] = false;
-    ultimoCambio[i] = 0;
-  }
-
-  // Barrido de arranque: deben encenderse en orden 1 -> 4
-  for (byte i = 0; i < 4; i++) { digitalWrite(PINES_LED[i], HIGH); delay(150); }
-  delay(200);
-  for (byte i = 0; i < 4; i++) digitalWrite(PINES_LED[i], LOW);
-
-  potSuavizado = analogRead(PIN_POT);
+  setupPins();
+  playStartupSweep();
+  smoothedKnob = analogRead(KNOB_PIN);
   Serial.println(F("READY"));
-  enviarPot();
+  sendKnob();
 }
 
-void loopDiagnostico() {
-  for (byte p = 2; p <= 13; p++) {
-    int v = digitalRead(p);
-    if (v != prevPin[p]) {
-      prevPin[p] = v;
-      Serial.print(F("Pin "));
-      Serial.print(p);
-      Serial.println(v ? F(" -> HIGH") : F(" -> LOW"));
+void readButtons() {
+  // El cambio se acepta de inmediato y luego se ignoran los rebotes por unos milisegundos.
+  unsigned long nowUs = micros();
+  for (byte i = 0; i < BUTTON_COUNT; i++) {
+    bool down = isButtonDown(i);
+    if (down != pressed[i] && nowUs - lastButtonChangeUs[i] >= DEBOUNCE_US) {
+      pressed[i] = down;
+      lastButtonChangeUs[i] = nowUs;
+      sendButton(i);
     }
   }
-  int pot = analogRead(PIN_POT);
-  if (abs(pot - prevPotDiag) > 30) {
-    prevPotDiag = pot;
-    Serial.print(F("A0 = "));
-    Serial.println(pot);
-  }
-  delay(5);
 }
 
-void leerSerial() {
+void readKnob(unsigned long nowMs) {
+  if (nowMs - lastKnobReadMs < KNOB_INTERVAL_MS) return;
+  lastKnobReadMs = nowMs;
+  smoothedKnob = (smoothedKnob * (KNOB_SMOOTHING - 1) + analogRead(KNOB_PIN)) / KNOB_SMOOTHING;
+  if (abs(smoothedKnob - lastSentKnob) >= KNOB_MIN_CHANGE) sendKnob();
+}
+
+void sendHeartbeat(unsigned long nowMs) {
+  if (nowMs - lastHeartbeatMs < HEARTBEAT_INTERVAL_MS) return;
+  lastHeartbeatMs = nowMs;
+  Serial.println('H');
+}
+
+void runCommand() {
+  if (command[0] == 'L' && commandLength >= 2) {
+    int value = command[1] - '0';
+    if (value >= 0 && value <= BUTTON_COUNT) {
+      litLeds = value;
+      blinking = false;
+    } else if (value == BLINK_COMMAND) {
+      litLeds = BUTTON_COUNT;
+      blinking = true;
+    }
+  } else if (command[0] == '?') {
+    for (byte i = 0; i < BUTTON_COUNT; i++) sendButton(i);
+    sendKnob();
+  }
+}
+
+void readCommands() {
   while (Serial.available()) {
     char c = Serial.read();
     if (c == '\n' || c == '\r') {
-      if (bufLen > 0) {
-        buffer[bufLen] = 0;
-        if (buffer[0] == 'L' && bufLen >= 2) {
-          int n = buffer[1] - '0';
-          if (n >= 0 && n <= 4) { ledsPedidos = n; parpadeo = false; }
-          else if (n == 5) { ledsPedidos = 4; parpadeo = true; }
-        } else if (buffer[0] == '?') {
-          for (byte i = 0; i < 4; i++) enviarBoton(i);
-          enviarPot();
-        }
+      if (commandLength > 0) {
+        command[commandLength] = 0;
+        runCommand();
       }
-      bufLen = 0;
-    } else if (bufLen < sizeof(buffer) - 1) {
-      buffer[bufLen++] = c;
+      commandLength = 0;
+    } else if (commandLength < sizeof(command) - 1) {
+      command[commandLength++] = c;
     }
   }
 }
 
-void actualizarLeds() {
-  unsigned long ahora = millis();
-  if (parpadeo) {
-    if (ahora - ultimoParpadeoMs >= INTERVALO_PARPADEO_MS) {
-      ultimoParpadeoMs = ahora;
-      faseParpadeo = !faseParpadeo;
-    }
-    for (byte i = 0; i < 4; i++) digitalWrite(PINES_LED[i], faseParpadeo ? HIGH : LOW);
-  } else {
-    for (byte i = 0; i < 4; i++) digitalWrite(PINES_LED[i], i < ledsPedidos ? HIGH : LOW);
+void updateLeds(unsigned long nowMs) {
+  if (blinking && nowMs - lastBlinkMs >= BLINK_INTERVAL_MS) {
+    lastBlinkMs = nowMs;
+    blinkOn = !blinkOn;
+  }
+  for (byte i = 0; i < BUTTON_COUNT; i++) {
+    bool on = blinking ? blinkOn : i < litLeds;
+    digitalWrite(LED_PINS[i], on ? HIGH : LOW);
   }
 }
 
 void loop() {
-  if (MODO_DIAGNOSTICO) { loopDiagnostico(); return; }
-
-  // Botones: se acepta el cambio de inmediato y luego se ignoran rebotes 8 ms
-  unsigned long ahoraUs = micros();
-  for (byte i = 0; i < 4; i++) {
-    bool lectura = leerBoton(i);
-    if (lectura != estado[i] && (ahoraUs - ultimoCambio[i]) >= DEBOUNCE_US) {
-      estado[i] = lectura;
-      ultimoCambio[i] = ahoraUs;
-      enviarBoton(i);
-    }
+  if (DIAGNOSTIC_MODE) {
+    loopDiagnostics();
+    return;
   }
+  unsigned long nowMs = millis();
+  readButtons();
+  readKnob(nowMs);
+  sendHeartbeat(nowMs);
+  readCommands();
+  updateLeds(nowMs);
+}
 
-  // Potenciometro suavizado
-  unsigned long ahoraMs = millis();
-  if (ahoraMs - ultimoPotMs >= INTERVALO_POT_MS) {
-    ultimoPotMs = ahoraMs;
-    potSuavizado = (potSuavizado * 3 + analogRead(PIN_POT)) / 4;
-    if (abs(potSuavizado - ultimoPotEnviado) >= UMBRAL_POT) enviarPot();
+// Diagnostico de cableado
+
+void setupDiagnostics() {
+  delay(DIAGNOSTIC_START_MS);
+  Serial.println(F("=== DIAGNOSTICO 1/2: LEDs ==="));
+  Serial.println(F("Mira que LED se enciende con cada pin y anotalo."));
+  for (byte pin = FIRST_DIAGNOSTIC_PIN; pin <= LAST_DIAGNOSTIC_PIN; pin++) {
+    // Solo se pone el pin en HIGH (nunca en LOW), asi es seguro aunque sea un boton.
+    digitalWrite(pin, HIGH);
+    pinMode(pin, OUTPUT);
+    Serial.print(F("Pin "));
+    Serial.print(pin);
+    Serial.println(F(" encendido"));
+    delay(DIAGNOSTIC_LED_MS);
+    pinMode(pin, INPUT);
+    digitalWrite(pin, LOW);
   }
-
-  if (ahoraMs - ultimoLatidoMs >= 1000) {
-    ultimoLatidoMs = ahoraMs;
-    Serial.println('H');
+  for (byte pin = FIRST_DIAGNOSTIC_PIN; pin <= LAST_DIAGNOSTIC_PIN; pin++) {
+    pinMode(pin, INPUT);
+    lastPinLevel[pin] = digitalRead(pin);
   }
+  Serial.println(F("=== DIAGNOSTICO 2/2: BOTONES Y PERILLA ==="));
+  Serial.println(F("Presiona cada boton y anota que pin cambia. Gira la perilla para probar A0."));
+}
 
-  leerSerial();
-  actualizarLeds();
+void loopDiagnostics() {
+  for (byte pin = FIRST_DIAGNOSTIC_PIN; pin <= LAST_DIAGNOSTIC_PIN; pin++) {
+    int level = digitalRead(pin);
+    if (level == lastPinLevel[pin]) continue;
+    lastPinLevel[pin] = level;
+    Serial.print(F("Pin "));
+    Serial.print(pin);
+    Serial.println(level ? F(" -> HIGH") : F(" -> LOW"));
+  }
+  int knob = analogRead(KNOB_PIN);
+  if (abs(knob - lastDiagnosticKnob) > DIAGNOSTIC_KNOB_CHANGE) {
+    lastDiagnosticKnob = knob;
+    Serial.print(F("A0 = "));
+    Serial.println(knob);
+  }
+  delay(DIAGNOSTIC_LOOP_MS);
 }
