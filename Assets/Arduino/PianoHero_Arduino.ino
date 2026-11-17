@@ -1,12 +1,3 @@
-// PianoHero - control con Arduino Uno
-// Entradas: 4 botones (carriles) y 1 potenciometro (seleccion de cancion).
-// Salidas: 4 LEDs que muestran la racha.
-//
-// Protocolo serial (115200 baudios, un mensaje por linea):
-//   Arduino -> PC: "READY" al arrancar, "B1:1"/"B1:0" boton presionado/soltado (B1..B4),
-//                  "P:734" potenciometro 0-1023 (solo cuando cambia), "H" latido cada segundo.
-//   PC -> Arduino: "L0".."L4" LEDs encendidos, "L5" los cuatro parpadeando, "?" reenviar estado.
-
 const byte BUTTON_COUNT = 4;
 const byte BUTTON_PINS[BUTTON_COUNT] = {6, 7, 8, 9};   // verde, rojo, amarillo, azul
 const byte LED_PINS[BUTTON_COUNT] = {2, 3, 4, 5};      // se encienden en este orden
@@ -213,7 +204,7 @@ void setupDiagnostics() {
   Serial.println(F("DIAGNOSTICO 1/2: LEDs"));
   Serial.println(F("Mira que LED se enciende con cada pin y anotalo."));
   for (byte pin = FIRST_DIAGNOSTIC_PIN; pin <= LAST_DIAGNOSTIC_PIN; pin++) {
-    // Solo se pone el pin en HIGH (nunca en LOW), asi es seguro aunque sea un boton.
+    // Solo se pone el pin en HIGH, asi es seguro aunque sea un boton.
     digitalWrite(pin, HIGH);
     pinMode(pin, OUTPUT);
     Serial.print(F("Pin "));
